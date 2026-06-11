@@ -1,0 +1,44 @@
+version: 2
+
+models:
+  - name: core__worldbank_indicators
+    description: >
+      Indicateurs World Bank nettoyés — renommage sémantique de time→period
+      et value→indicator_value. NULLs conservés (lacunes WB attendues).
+    columns:
+      - name: period
+        description: "1er janvier de l'année (UTC) — renommé depuis 'time'"
+      - name: country_code
+        description: "Code ISO3 (SEN, CIV)"
+      - name: indicator_code
+        description: "Code officiel World Bank (ex: FP.CPI.TOTL.ZG)"
+      - name: indicator_name
+        description: "Libellé long de l'indicateur"
+      - name: indicator_value
+        description: "Valeur numérique — NULL conservé si WB n'a pas de donnée"
+      - name: ingested_at
+        description: "Timestamp d'insertion original depuis le loader Python"
+
+  - name: core__wfp_food_prices
+    description: >
+      Prix alimentaires WFP nettoyés — time renommé period pour cohérence
+      avec core__worldbank_indicators. NULLs price_local/price_usd conservés.
+    columns:
+      - name: period
+        description: "1er du mois (UTC) — renommé depuis 'time'"
+      - name: country_code
+        description: "Code ISO3 (SEN, CIV)"
+      - name: market_name
+        description: "Nom du marché physique (ex: Dakar, Abidjan)"
+      - name: commodity
+        description: "Commodité alimentaire (ex: Millet, Riz importé)"
+      - name: unit
+        description: "Unité de mesure (ex: KG)"
+      - name: currency
+        description: "Devise — toujours XOF (Franc CFA UEMOA)"
+      - name: price_local
+        description: "Prix en XOF — NULL si rupture de collecte (colonne nullable)"
+      - name: price_usd
+        description: "Prix USD — NULL si rupture de collecte"
+      - name: ingested_at
+        description: "Timestamp d'insertion original depuis le loader Python"

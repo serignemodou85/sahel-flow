@@ -1,0 +1,15 @@
+sahel_flow:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      # Dans Docker (tâches Airflow) : POSTGRES_HOST=timescaledb (nom du service)
+      # En dev local (dbt run direct) :  POSTGRES_HOST=localhost
+      host:     "{{ env_var('POSTGRES_HOST', 'localhost') }}"
+      port:     "{{ env_var('POSTGRES_PORT', '5432') | int }}"
+      dbname:   "{{ env_var('POSTGRES_DB', 'sahel_flow') }}"
+      user:     "{{ env_var('POSTGRES_USER', 'sahel') }}"
+      password: "{{ env_var('POSTGRES_PASSWORD', 'sahel_secret') }}"
+      # schema par défaut (utilisé si un modèle n'a pas de +schema dans dbt_project.yml)
+      schema:   dbt
+      threads:  4

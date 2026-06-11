@@ -1,0 +1,153 @@
+version: "3.8"
+
+# =============================================================================
+# sahel-flow — docker-compose.yml
+# Phase 1 : TimescaleDB + Airflow (LocalExecutor)
+# Phases suivantes : les services Grafana, FastAPI, Streamlit, Jenkins
+# seront ajoutés dans leurs sections dédiées sans modifier ce qui existe.
+# =============================================================================
+
+# ── YAML Anchor : config commune aux 3 containers Airflow ─────────────────────
+# Évite de répéter environment + volumes dans airflow-init, webserver, scheduler.
+# Chaque service hérite avec "<<: *airflow-common" et surcharge ce dont il a besoin.
+x-airflow-common:
+  &airflow-common
+  build:
+    context: .                              # racine du projet = contexte de build
+    dockerfile: infra/airflow/Dockerfile   # notre image custom avec les dépendances
+  environment:
+    &airflow-common-env
+    # LocalExecutor : le scheduler exécute les tâches en sous-processus locaux.
+    # Pas de Redis, pas de worker séparé — suffisant pour nos ingestions mensuelles.
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+
+    # Connexion vers la database "airflow" dans notre instance TimescaleDB.
+    # "timescaledb" = nom du service Docker, résolu automatiquement sur le réseau sahel_net.
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER:-sahel}:${POSTGRES_PASSWORD:-sahel_secret}@timescaledb/airflow
+
+    # Clé de chiffrement pour les connexions sensibles stockées dans Airflow (mdp, tokens).
+    # Générer avec : python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    # Si vide en dev : Airflow fonctionne mais les connexions ne survivent pas au redémarrage.
+    AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY:-}
+
+    # Clé secrète pour les sessions web (cookies).
+    AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW_SECRET_KEY:-change_me_in_production}
+
+    # Les modules shared/ et ingestion/ sont montés dans /opt/airflow/.
+    # PYTHONPATH permet : from shared.config import get_settings dans les DAGs et tâches.
+    PYTHONPATH: /opt/airflow
+
+    # Désactive les ~20 DAGs d'exemple fournis par Airflow — inutiles ici.
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+
+    # Sécurité : les nouveaux DAGs déposés dans /dags ne s'exécutent pas automatiquement.
+    # Il faut les activer manuellement dans l'UI — évite des runs inattendus.
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
+
+  volumes:
+    # Nos DAGs sont lus directement depuis le filesystem local (hot-reload).
+    - ./dags:/opt/airflow/dags
+    # dbt, shared et ingestion sont montés pour que les tâches Airflow y accèdent.
+    - ./dbt:/opt/airflow/dbt
+    - ./shared:/opt/airflow/shared
+    - ./ingestion:/opt/airflow/ingestion
+    # Volume nommé pour persister les logs des tâches entre redémarrages.
+    - airflow_logs:/opt/airflow/logs
+
+  networks:
+    - sahel_net
+
+
+services:
+
+  # ── 1. TimescaleDB ────────────────────────────────────────────────────────────
+  # Joue deux rôles : data warehouse sahel_flow + metadata store Airflow.
+  # Une seule instance PostgreSQL, deux databases créées par init.sql.
+  timescaledb:
+    image: timescale/timescaledb:latest-pg15
+    container_name: sahel_timescaledb
+    environment:
+      POSTGRES_DB: sahel_flow                          # database principale (créée par l'image)
+      POSTGRES_USER: ${POSTGRES_USER:-sahel}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sahel_secret}
+    ports:
+      - "5432:5432"                                    # exposé localement pour dbt run, psql, tests
+    volumes:
+      - timescaledb_data:/var/lib/postgresql/data      # données persistées entre redémarrages
+      - ./infra/timescaledb/init.sql:/docker-entrypoint-initdb.d/01_init.sql
+      # init.sql s'exécute une seule fois à la création du volume (voir infra/timescaledb/init.sql)
+    healthcheck:
+      # Les services Airflow attendent ce healthcheck avant de démarrer.
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sahel} -d sahel_flow"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - sahel_net
+
+  # ── 2. airflow-init ──────────────────────────────────────────────────────────
+  # Container one-shot : s'exécute une fois, crée le schéma Airflow + l'admin, puis s'arrête.
+  # restart: "no" garantit qu'il ne se relance jamais.
+  airflow-init:
+    <<: *airflow-common
+    container_name: sahel_airflow_init
+    restart: "no"
+    depends_on:
+      timescaledb:
+        condition: service_healthy    # attend que PostgreSQL accepte des connexions
+    command: >
+      bash -c "
+        airflow db migrate &&
+        airflow users create
+          --username admin
+          --password admin
+          --firstname Admin
+          --lastname User
+          --role Admin
+          --email admin@sahel-flow.local
+      "
+
+  # ── 3. airflow-webserver ─────────────────────────────────────────────────────
+  # Interface web Airflow : visualiser les DAGs, déclencher des runs, consulter les logs.
+  airflow-webserver:
+    <<: *airflow-common
+    container_name: sahel_airflow_web
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully   # webserver attend la fin du init
+    ports:
+      - "8080:8080"                                # UI : http://localhost:8080
+    command: webserver
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # ── 4. airflow-scheduler ─────────────────────────────────────────────────────
+  # Orchestre les DAGs et exécute les tâches (LocalExecutor = sous-processus locaux).
+  # Pas de container worker séparé — le scheduler fait les deux.
+  airflow-scheduler:
+    <<: *airflow-common
+    container_name: sahel_airflow_scheduler
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+    command: scheduler
+
+
+# ── Volumes nommés ─────────────────────────────────────────────────────────────
+volumes:
+  timescaledb_data:   # données PostgreSQL / TimescaleDB
+  airflow_logs:       # logs des tâches Airflow
+
+# ── Réseau interne ─────────────────────────────────────────────────────────────
+# Les containers se parlent par nom de service (ex: host "timescaledb" pour PostgreSQL).
+# Isolé du reste de la machine — seuls les ports explicitement publiés sont accessibles.
+networks:
+  sahel_net:
+    driver: bridge

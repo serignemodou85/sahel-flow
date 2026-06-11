@@ -1,0 +1,53 @@
+version: 2
+
+sources:
+  - name: raw
+    description: "Données brutes ingérées par les scripts Python (ingestion/). Jamais modifiées."
+    schema: raw
+
+    tables:
+      - name: ht_worldbank_indicators
+        description: "Indicateurs macro World Bank — 5 codes, SEN + CIV, granularité annuelle"
+        loaded_at_field: ingested_at
+        freshness:
+          warn_after:  {count: 35, period: day}   # ingestion mensuelle + marge de 5 jours
+          error_after: {count: 40, period: day}
+        columns:
+          - name: time
+            description: "1er janvier de l'année de l'indicateur (timestamptz UTC)"
+          - name: country_code
+            description: "Code ISO3 (SEN = Sénégal, CIV = Côte d'Ivoire)"
+          - name: indicator_code
+            description: "Code officiel World Bank (ex: FP.CPI.TOTL.ZG)"
+          - name: indicator_name
+            description: "Libellé long de l'indicateur"
+          - name: value
+            description: "Valeur numérique — NULL si WB n'a pas de donnée pour cette année"
+          - name: ingested_at
+            description: "Timestamp d'insertion par le loader Python (DEFAULT now())"
+
+      - name: ht_wfp_food_prices
+        description: "Prix alimentaires WFP Data Bridges — marchés SEN + CIV, granularité mensuelle"
+        loaded_at_field: ingested_at
+        freshness:
+          warn_after:  {count: 35, period: day}
+          error_after: {count: 40, period: day}
+        columns:
+          - name: time
+            description: "1er du mois de relevé de prix (timestamptz UTC)"
+          - name: country_code
+            description: "Code ISO3 (SEN, CIV)"
+          - name: market_name
+            description: "Nom du marché physique (ex: Dakar, Abidjan)"
+          - name: commodity
+            description: "Commodité alimentaire (ex: Millet, Riz importé)"
+          - name: unit
+            description: "Unité de mesure (ex: KG)"
+          - name: currency
+            description: "Devise — toujours XOF (Franc CFA UEMOA)"
+          - name: price_local
+            description: "Prix en XOF — NULL si rupture de collecte sur ce marché"
+          - name: price_usd
+            description: "Prix converti en USD — NULL si rupture de collecte"
+          - name: ingested_at
+            description: "Timestamp d'insertion par le loader Python (DEFAULT now())"

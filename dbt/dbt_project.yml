@@ -1,0 +1,30 @@
+name: 'sahel_flow'
+version: '1.0.0'
+config-version: 2
+
+profile: 'sahel_flow'
+
+model-paths:    ["models"]
+macro-paths:    ["macros"]
+test-paths:     ["tests"]
+snapshot-paths: ["snapshots"]
+
+target-path: "target"
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+models:
+  sahel_flow:
+    raw:
+      +schema: raw        # vues écrites dans le schema raw (même schema que les tables physiques)
+      +materialized: view # raw = wrappers stables, aucune duplication de données
+    core:
+      +schema: core
+      +materialized: view
+    marts:
+      +schema: marts
+      +materialized: table # marts = tables physiques optimisées pour les requêtes API/Grafana
+    monitoring:
+      +schema: monitoring
+      +materialized: view

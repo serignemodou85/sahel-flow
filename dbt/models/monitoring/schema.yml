@@ -1,0 +1,53 @@
+version: 2
+
+# Les modèles mon__* sont des outils d'observabilité, pas des données métier.
+# Pas de dbt tests sur eux-mêmes : ils mesurent la santé du pipeline,
+# ce sont les marts qui portent les assertions de qualité.
+
+models:
+  - name: mon__pipeline_freshness
+    description: >
+      Fraîcheur de chaque table source raw — last_ingested_at et âge.
+      Une ligne par table source. Requêté par Grafana pour les panels de monitoring.
+    columns:
+      - name: source_table
+        description: "Nom de la table raw (ht_worldbank_indicators, ht_wfp_food_prices)"
+      - name: last_ingested_at
+        description: "MAX(ingested_at) — timestamp de la dernière ligne insérée"
+      - name: age
+        description: "Intervalle depuis la dernière ingestion (now() - last_ingested_at)"
+      - name: total_rows
+        description: "Nombre total de lignes dans la table"
+
+  - name: mon__null_rates
+    description: >
+      Taux de NULL par colonne clé, par source et par période.
+      WB = granularité annuelle sur 'value'. WFP = granularité mensuelle sur 'price_local'.
+    columns:
+      - name: source
+        description: "Identifiant de la source (worldbank_indicators, wfp_food_prices)"
+      - name: monitored_column
+        description: "Colonne surveillée (value pour WB, price_local pour WFP)"
+      - name: period
+        description: "Début de la période agrégée (année ou mois selon la source)"
+      - name: total_rows
+        description: "Nombre total de lignes pour cette période"
+      - name: null_count
+        description: "Nombre de lignes avec la colonne surveillée à NULL"
+      - name: null_rate_pct
+        description: "Pourcentage de NULL arrondi à 2 décimales"
+
+  - name: mon__row_counts
+    description: >
+      Nombre de lignes ingérées par source, période et pays.
+      Sert à détecter la disparition d'un pays dans les données.
+      Note : les mois sans données n'apparaissent pas (COUNT = 0 non représenté).
+    columns:
+      - name: source
+        description: "Identifiant de la source"
+      - name: period
+        description: "Début de la période (année pour WB, mois pour WFP)"
+      - name: country_code
+        description: "Code ISO3 (SEN, CIV)"
+      - name: row_count
+        description: "Nombre de lignes pour ce pays et cette période"

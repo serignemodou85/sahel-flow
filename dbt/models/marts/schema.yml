@@ -1,0 +1,83 @@
+version: 2
+
+models:
+  - name: mart__food__prices_monthly
+    description: >
+      Prix alimentaires WFP agrégés par pays, commodité et mois.
+      Moyenne sur tous les marchés disponibles — market_count indique le nombre
+      de marchés dans la moyenne, null_price_count les marchés sans relevé.
+    columns:
+      - name: period
+        description: "1er du mois (UTC)"
+      - name: country_code
+        description: "Code ISO3 (SEN, CIV)"
+      - name: commodity
+        description: "Commodité alimentaire (ex: Millet, Riz importé)"
+      - name: unit
+        description: "Unité de mesure (ex: KG)"
+      - name: currency
+        description: "Devise (XOF)"
+      - name: avg_price_local
+        description: "Prix moyen en XOF sur tous les marchés ce mois — NULL si aucun prix disponible"
+      - name: avg_price_usd
+        description: "Prix moyen en USD — NULL si aucun prix disponible"
+      - name: market_count
+        description: "Nombre de marchés distincts dans la moyenne"
+        tests:
+          - not_null
+      - name: null_price_count
+        description: "Nombre de marchés sans prix (rupture de collecte) — indicateur de couverture"
+      - name: last_ingested_at
+        description: "Timestamp d'ingestion le plus récent pour ce groupe"
+
+  - name: mart__macro__indicators_annual
+    description: >
+      Indicateurs World Bank annuels avec variation year-over-year.
+      yoy_change_pct est NULL pour la première année disponible ou si indicator_value est NULL.
+    columns:
+      - name: period
+        description: "1er janvier de l'année (UTC)"
+      - name: country_code
+        description: "Code ISO3 (SEN, CIV)"
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['SEN', 'CIV']
+      - name: indicator_code
+        description: "Code World Bank (ex: FP.CPI.TOTL.ZG)"
+      - name: indicator_name
+        description: "Libellé long de l'indicateur"
+      - name: indicator_value
+        description: "Valeur — NULL si WB n'a pas de donnée pour cette année"
+      - name: prev_year_value
+        description: "Valeur N-1 (LAG) — NULL pour la première année dans les données"
+      - name: yoy_change_pct
+        description: "Variation annuelle en % arrondie à 2 décimales — NULL si une valeur manque"
+      - name: ingested_at
+        description: "Timestamp d'insertion original"
+
+  - name: mart__risk__score_monthly
+    description: >
+      Score de risque alimentaire 0–100 par pays et mois.
+      Formule : 0.6 * price_trend_score + 0.4 * inflation_score.
+      Les 3 premiers mois par pays sont absents (baseline_3m non calculable).
+      LEFT JOIN WB : si inflation manque pour une année, inflation_score = 0.
+    columns:
+      - name: period
+        description: "1er du mois (UTC)"
+      - name: country_code
+        description: "Code ISO3 (SEN, CIV)"
+      - name: avg_price_usd
+        description: "Prix moyen USD toutes commodités confondues ce mois"
+      - name: baseline_3m
+        description: "Prix moyen des 3 mois précédents — fenêtre glissante, même pays"
+      - name: price_trend_score
+        description: "Composante prix 0–100 : hausse +20% → 100, stable/baisse → 0"
+      - name: inflation_rate
+        description: "Taux d'inflation annuel WB — NULL si WB n'a pas publié pour cette année"
+      - name: inflation_score
+        description: "Composante inflation 0–100 : 20% → 100, 0% → 0. Vaut 0 si inflation_rate NULL."
+      - name: risk_score
+        description: "Score composite arrondi à 2 décimales : 0.6 * price + 0.4 * inflation"
+        tests:
+          - not_null

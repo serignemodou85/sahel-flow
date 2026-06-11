@@ -1,0 +1,49 @@
+# ── Secrets — NE JAMAIS committer ────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+.pgpass
+
+# ── Python ───────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+.venv/
+venv/
+
+# ── dbt ──────────────────────────────────────────────────────────────────────
+dbt/target/
+dbt/dbt_packages/
+dbt/logs/
+
+# ── Airflow ───────────────────────────────────────────────────────────────────
+logs/
+airflow.db
+airflow/logs/
+
+# ── Docker volumes locaux ─────────────────────────────────────────────────────
+docker-compose.override.yml
+postgres_data/
+grafana_data/
+
+# ── IDE ───────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+
+# ── OS ───────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── Documentation personnelle ─────────────────────────────────────────────────
+docs/

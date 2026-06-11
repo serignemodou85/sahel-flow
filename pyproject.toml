@@ -1,0 +1,6 @@
+[tool.pytest.ini_options]
+# "." dans pythonpath = le projet root est sur le PYTHONPATH.
+# Permet : from ingestion.sources.world_bank import WorldBankSource
+# Sans ça, pytest ne trouve pas les packages locaux.
+pythonpath = ["."]
+testpaths  = ["ingestion/tests"]
