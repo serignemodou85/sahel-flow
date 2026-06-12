@@ -161,11 +161,55 @@ services:
     networks:
       - sahel_net
 
+  # ── 6. Streamlit ─────────────────────────────────────────────────────────────
+  # Vitrine portfolio : consomme l'API FastAPI uniquement (jamais TimescaleDB directement).
+  # API_BASE_URL = "http://api:8000" car les deux services sont sur sahel_net.
+  # UI : http://localhost:8501
+  streamlit:
+    build:
+      context: apps/streamlit
+    container_name: sahel_streamlit
+    depends_on:
+      - api
+    ports:
+      - "8501:8501"
+    environment:
+      API_BASE_URL: http://api:8000
+    networks:
+      - sahel_net
+
+  # ── 7. Grafana ────────────────────────────────────────────────────────────────
+  # Dashboards de monitoring : prix alimentaires, inflation, risk score.
+  # Provisioning automatique via fichiers montés — aucun clic, tout est versionné.
+  # UI : http://localhost:3000  (login admin / valeur de GRAFANA_PASSWORD)
+  grafana:
+    image: grafana/grafana:10.4.0
+    container_name: sahel_grafana
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_AUTH_ANONYMOUS_ENABLED: "true"            # lecture sans login en dev local
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      # Variables passées au provisioning datasource (timescaledb.yml les lit via $VAR)
+      POSTGRES_USER: ${POSTGRES_USER:-sahel}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sahel_secret}
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards
+      - grafana_data:/var/lib/grafana
+    networks:
+      - sahel_net
+
 
 # ── Volumes nommés ─────────────────────────────────────────────────────────────
 volumes:
   timescaledb_data:   # données PostgreSQL / TimescaleDB
   airflow_logs:       # logs des tâches Airflow
+  grafana_data:       # dashboards, alertes et préférences Grafana
 
 # ── Réseau interne ─────────────────────────────────────────────────────────────
 # Les containers se parlent par nom de service (ex: host "timescaledb" pour PostgreSQL).

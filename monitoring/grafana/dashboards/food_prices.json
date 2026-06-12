@@ -1,0 +1,239 @@
+{
+  "annotations": { "list": [] },
+  "description": "Surveillance des prix alimentaires — Zone UEMOA (SEN + CIV)",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "links": [],
+  "panels": [
+    {
+      "datasource": { "type": "postgres", "uid": "timescaledb" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2, "pointSize": 3, "showPoints": "never" },
+          "unit": "currencyUSD"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 0 },
+      "id": 1,
+      "options": {
+        "legend": { "calcs": ["last", "min", "max"], "displayMode": "table", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "timescaledb" },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  period::timestamp AS time,\n  AVG(avg_price_usd) AS \"SEN\"\nFROM marts.mart__food__prices_monthly\nWHERE country_code = 'SEN'\n  AND period::timestamp >= $__timeFrom()\n  AND period::timestamp <= $__timeTo()\nGROUP BY period\nORDER BY time",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "postgres", "uid": "timescaledb" },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  period::timestamp AS time,\n  AVG(avg_price_usd) AS \"CIV\"\nFROM marts.mart__food__prices_monthly\nWHERE country_code = 'CIV'\n  AND period::timestamp >= $__timeFrom()\n  AND period::timestamp <= $__timeTo()\nGROUP BY period\nORDER BY time",
+          "refId": "B"
+        }
+      ],
+      "title": "Prix USD moyen — SEN vs CIV",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "timescaledb" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "blue" },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 8 },
+      "id": 2,
+      "options": { "colorMode": "background", "graphMode": "none", "textMode": "auto" },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "timescaledb" },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  NOW() AS time,\n  SUM(market_count) AS value\nFROM marts.mart__food__prices_monthly\nWHERE country_code = 'SEN'\n  AND period = (SELECT MAX(period) FROM marts.mart__food__prices_monthly WHERE country_code = 'SEN')",
+          "refId": "A"
+        }
+      ],
+      "title": "Marchés actifs — SEN",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "timescaledb" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "green" },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 8 },
+      "id": 3,
+      "options": { "colorMode": "background", "graphMode": "none", "textMode": "auto" },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "timescaledb" },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  NOW() AS time,\n  SUM(market_count) AS value\nFROM marts.mart__food__prices_monthly\nWHERE country_code = 'CIV'\n  AND period = (SELECT MAX(period) FROM marts.mart__food__prices_monthly WHERE country_code = 'CIV')",
+          "refId": "A"
+        }
+      ],
+      "title": "Marchés actifs — CIV",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "timescaledb" },
+      "fieldConfig": {
+        "defaults": { "unit": "dateTimeFromNow" },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 12, "x": 12, "y": 8 },
+      "id": 4,
+      "options": { "colorMode": "none", "graphMode": "none", "textMode": "auto" },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "timescaledb" },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  NOW() AS time,\n  EXTRACT(EPOCH FROM MAX(last_ingested_at)) * 1000 AS value\nFROM marts.mart__food__prices_monthly",
+          "refId": "A"
+        }
+      ],
+      "title": "Dernière ingestion",
+      "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 12 },
+      "id": 10,
+      "title": "Drill-down par pays",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "timescaledb" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2, "showPoints": "never" },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 13 },
+      "id": 5,
+      "options": {
+        "legend": { "calcs": ["last"], "displayMode": "list", "placement": "right" },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "timescaledb" },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  period::timestamp AS time,\n  commodity AS metric,\n  avg_price_local AS value\nFROM marts.mart__food__prices_monthly\nWHERE country_code = '${country}'\n  AND period::timestamp >= $__timeFrom()\n  AND period::timestamp <= $__timeTo()\nORDER BY time, commodity",
+          "refId": "A"
+        }
+      ],
+      "title": "Prix par commodité (FCFA) — ${country}",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "timescaledb" },
+      "fieldConfig": {
+        "defaults": { "custom": { "align": "auto" } },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "avg_price_local" },
+            "properties": [
+              { "id": "displayName", "value": "Prix local (FCFA)" },
+              { "id": "unit", "value": "short" }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "avg_price_usd" },
+            "properties": [
+              { "id": "displayName", "value": "Prix USD" },
+              { "id": "unit", "value": "currencyUSD" }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "market_count" },
+            "properties": [{ "id": "displayName", "value": "Marchés" }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "null_price_count" },
+            "properties": [
+              { "id": "displayName", "value": "Prix manquants" },
+              { "id": "custom.displayMode", "value": "color-text" },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "green", "value": null },
+                    { "color": "orange", "value": 1 }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 22 },
+      "id": 6,
+      "options": { "footer": { "show": false }, "sortBy": [{ "desc": false, "displayName": "commodity" }] },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "timescaledb" },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  commodity,\n  unit,\n  avg_price_local,\n  avg_price_usd,\n  market_count,\n  null_price_count\nFROM marts.mart__food__prices_monthly\nWHERE country_code = '${country}'\n  AND period = (SELECT MAX(period) FROM marts.mart__food__prices_monthly WHERE country_code = '${country}')\nORDER BY commodity",
+          "refId": "A"
+        }
+      ],
+      "title": "Détail des prix (dernier mois disponible) — ${country}",
+      "type": "table"
+    }
+  ],
+  "refresh": "5m",
+  "schemaVersion": 38,
+  "tags": ["sahel-flow", "food-prices"],
+  "templating": {
+    "list": [
+      {
+        "current": { "selected": true, "text": "SEN", "value": "SEN" },
+        "hide": 0,
+        "includeAll": false,
+        "label": "Pays",
+        "name": "country",
+        "options": [
+          { "selected": true, "text": "SEN", "value": "SEN" },
+          { "selected": false, "text": "CIV", "value": "CIV" }
+        ],
+        "query": "SEN,CIV",
+        "type": "custom"
+      }
+    ]
+  },
+  "time": { "from": "now-2y", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Sahel Flow — Prix Alimentaires",
+  "uid": "food-prices",
+  "version": 1
+}

@@ -1,0 +1,306 @@
+{
+  "annotations": { "list": [] },
+  "description": "Surveillance de l'inflation macro-économique — Zone UEMOA (SEN + CIV)",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "links": [],
+  "panels": [
+    {
+      "datasource": { "type": "postgres", "uid": "timescaledb" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2, "showPoints": "auto", "pointSize": 5 },
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 5 },
+              { "color": "red", "value": 10 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 0 },
+      "id": 1,
+      "options": {
+        "legend": { "calcs": ["last", "min", "max", "mean"], "displayMode": "table", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "timescaledb" },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  period::timestamp AS time,\n  indicator_value AS \"SEN (%)\"\nFROM marts.mart__macro__indicators_annual\nWHERE country_code = 'SEN'\n  AND indicator_code = 'FP.CPI.TOTL.ZG'\n  AND indicator_value IS NOT NULL\nORDER BY time",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "postgres", "uid": "timescaledb" },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  period::timestamp AS time,\n  indicator_value AS \"CIV (%)\"\nFROM marts.mart__macro__indicators_annual\nWHERE country_code = 'CIV'\n  AND indicator_code = 'FP.CPI.TOTL.ZG'\n  AND indicator_value IS NOT NULL\nORDER BY time",
+          "refId": "B"
+        }
+      ],
+      "title": "Inflation annuelle — SEN vs CIV (FP.CPI.TOTL.ZG)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "timescaledb" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 5 },
+              { "color": "red", "value": 10 }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 8 },
+      "id": 2,
+      "options": { "colorMode": "background", "graphMode": "none", "textMode": "auto" },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "timescaledb" },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  NOW() AS time,\n  indicator_value AS value\nFROM marts.mart__macro__indicators_annual\nWHERE country_code = 'SEN'\n  AND indicator_code = 'FP.CPI.TOTL.ZG'\n  AND indicator_value IS NOT NULL\nORDER BY period DESC\nLIMIT 1",
+          "refId": "A"
+        }
+      ],
+      "title": "Inflation actuelle — SEN",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "timescaledb" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 5 },
+              { "color": "red", "value": 10 }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 8 },
+      "id": 3,
+      "options": { "colorMode": "background", "graphMode": "none", "textMode": "auto" },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "timescaledb" },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  NOW() AS time,\n  indicator_value AS value\nFROM marts.mart__macro__indicators_annual\nWHERE country_code = 'CIV'\n  AND indicator_code = 'FP.CPI.TOTL.ZG'\n  AND indicator_value IS NOT NULL\nORDER BY period DESC\nLIMIT 1",
+          "refId": "A"
+        }
+      ],
+      "title": "Inflation actuelle — CIV",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "timescaledb" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "super-light-blue", "value": 0 },
+              { "color": "red", "value": 5 }
+            ]
+          },
+          "unit": "percent",
+          "noValue": "N/A"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 8 },
+      "id": 4,
+      "options": { "colorMode": "value", "graphMode": "none", "textMode": "auto" },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "timescaledb" },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  NOW() AS time,\n  yoy_change_pct AS value\nFROM marts.mart__macro__indicators_annual\nWHERE country_code = 'SEN'\n  AND indicator_code = 'FP.CPI.TOTL.ZG'\n  AND yoy_change_pct IS NOT NULL\nORDER BY period DESC\nLIMIT 1",
+          "refId": "A"
+        }
+      ],
+      "title": "Variation YoY — SEN",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "timescaledb" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 5 }
+            ]
+          },
+          "unit": "percent",
+          "noValue": "N/A"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 8 },
+      "id": 5,
+      "options": { "colorMode": "value", "graphMode": "none", "textMode": "auto" },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "timescaledb" },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  NOW() AS time,\n  yoy_change_pct AS value\nFROM marts.mart__macro__indicators_annual\nWHERE country_code = 'CIV'\n  AND indicator_code = 'FP.CPI.TOTL.ZG'\n  AND yoy_change_pct IS NOT NULL\nORDER BY period DESC\nLIMIT 1",
+          "refId": "A"
+        }
+      ],
+      "title": "Variation YoY — CIV",
+      "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 12 },
+      "id": 10,
+      "title": "Drill-down par pays",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "timescaledb" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2, "showPoints": "auto", "pointSize": 5 },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 13 },
+      "id": 6,
+      "options": {
+        "legend": { "calcs": ["last", "mean"], "displayMode": "table", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "timescaledb" },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  period::timestamp AS time,\n  indicator_value AS \"Inflation (%)\",\n  yoy_change_pct AS \"Variation YoY (%)\"\nFROM marts.mart__macro__indicators_annual\nWHERE country_code = '${country}'\n  AND indicator_code = 'FP.CPI.TOTL.ZG'\n  AND indicator_value IS NOT NULL\nORDER BY time",
+          "refId": "A"
+        }
+      ],
+      "title": "Inflation + Variation YoY — ${country}",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "timescaledb" },
+      "fieldConfig": {
+        "defaults": { "custom": { "align": "auto" } },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "indicator_value" },
+            "properties": [
+              { "id": "displayName", "value": "Inflation (%)" },
+              { "id": "unit", "value": "percent" },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "green", "value": null },
+                    { "color": "yellow", "value": 5 },
+                    { "color": "red", "value": 10 }
+                  ]
+                }
+              },
+              { "id": "custom.displayMode", "value": "color-background" }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "yoy_change_pct" },
+            "properties": [
+              { "id": "displayName", "value": "Variation YoY (%)" },
+              { "id": "unit", "value": "percent" }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "prev_year_value" },
+            "properties": [
+              { "id": "displayName", "value": "Inflation N-1 (%)" },
+              { "id": "unit", "value": "percent" }
+            ]
+          }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 13 },
+      "id": 7,
+      "options": { "footer": { "show": false } },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "timescaledb" },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  EXTRACT(YEAR FROM period)::int AS \"Année\",\n  indicator_value,\n  prev_year_value,\n  yoy_change_pct\nFROM marts.mart__macro__indicators_annual\nWHERE country_code = '${country}'\n  AND indicator_code = 'FP.CPI.TOTL.ZG'\nORDER BY period DESC",
+          "refId": "A"
+        }
+      ],
+      "title": "Historique inflation — ${country}",
+      "type": "table"
+    }
+  ],
+  "refresh": "1h",
+  "schemaVersion": 38,
+  "tags": ["sahel-flow", "inflation", "macroeconomie"],
+  "templating": {
+    "list": [
+      {
+        "current": { "selected": true, "text": "SEN", "value": "SEN" },
+        "hide": 0,
+        "includeAll": false,
+        "label": "Pays",
+        "name": "country",
+        "options": [
+          { "selected": true, "text": "SEN", "value": "SEN" },
+          { "selected": false, "text": "CIV", "value": "CIV" }
+        ],
+        "query": "SEN,CIV",
+        "type": "custom"
+      }
+    ]
+  },
+  "time": { "from": "now-10y", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Sahel Flow — Inflation",
+  "uid": "inflation",
+  "version": 1
+}

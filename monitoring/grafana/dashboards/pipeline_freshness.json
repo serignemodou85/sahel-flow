@@ -1,0 +1,367 @@
+{
+  "annotations": { "list": [] },
+  "description": "Observabilité du pipeline — fraîcheur des sources, volume ingéré, qualité des données",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "links": [],
+  "panels": [
+    {
+      "datasource": { "type": "postgres", "uid": "timescaledb" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null }
+            ]
+          },
+          "unit": "dateTimeAsLocal",
+          "noValue": "Jamais ingéré"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "id": 1,
+      "options": { "colorMode": "none", "graphMode": "none", "textMode": "auto" },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "timescaledb" },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  NOW() AS time,\n  EXTRACT(EPOCH FROM last_ingested_at) * 1000 AS value\nFROM monitoring.mon__pipeline_freshness\nWHERE source_table = 'ht_worldbank_indicators'",
+          "refId": "A"
+        }
+      ],
+      "title": "Dernière ingestion — WorldBank",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "timescaledb" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null }
+            ]
+          },
+          "unit": "dateTimeAsLocal",
+          "noValue": "Jamais ingéré"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "id": 2,
+      "options": { "colorMode": "none", "graphMode": "none", "textMode": "auto" },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "timescaledb" },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  NOW() AS time,\n  EXTRACT(EPOCH FROM last_ingested_at) * 1000 AS value\nFROM monitoring.mon__pipeline_freshness\nWHERE source_table = 'ht_wfp_food_prices'",
+          "refId": "A"
+        }
+      ],
+      "title": "Dernière ingestion — WFP",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "timescaledb" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 36 },
+              { "color": "red", "value": 72 }
+            ]
+          },
+          "min": 0,
+          "max": 168,
+          "unit": "h",
+          "noValue": "N/A"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "id": 3,
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+        "showThresholdLabels": true,
+        "showThresholdMarkers": true
+      },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "timescaledb" },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  NOW() AS time,\n  ROUND(EXTRACT(EPOCH FROM age) / 3600, 1) AS value\nFROM monitoring.mon__pipeline_freshness\nWHERE source_table = 'ht_worldbank_indicators'",
+          "refId": "A"
+        }
+      ],
+      "title": "Âge des données — WorldBank",
+      "type": "gauge"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "timescaledb" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 36 },
+              { "color": "red", "value": 72 }
+            ]
+          },
+          "min": 0,
+          "max": 168,
+          "unit": "h",
+          "noValue": "N/A"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "id": 4,
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+        "showThresholdLabels": true,
+        "showThresholdMarkers": true
+      },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "timescaledb" },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  NOW() AS time,\n  ROUND(EXTRACT(EPOCH FROM age) / 3600, 1) AS value\nFROM monitoring.mon__pipeline_freshness\nWHERE source_table = 'ht_wfp_food_prices'",
+          "refId": "A"
+        }
+      ],
+      "title": "Âge des données — WFP",
+      "type": "gauge"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "timescaledb" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "blue" },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 4 },
+      "id": 5,
+      "options": { "colorMode": "background", "graphMode": "none", "textMode": "auto" },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "timescaledb" },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  NOW() AS time,\n  total_rows AS value\nFROM monitoring.mon__pipeline_freshness\nWHERE source_table = 'ht_worldbank_indicators'",
+          "refId": "A"
+        }
+      ],
+      "title": "Total lignes en DB — WorldBank",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "timescaledb" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "green" },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 4 },
+      "id": 6,
+      "options": { "colorMode": "background", "graphMode": "none", "textMode": "auto" },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "timescaledb" },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  NOW() AS time,\n  total_rows AS value\nFROM monitoring.mon__pipeline_freshness\nWHERE source_table = 'ht_wfp_food_prices'",
+          "refId": "A"
+        }
+      ],
+      "title": "Total lignes en DB — WFP",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "timescaledb" },
+      "fieldConfig": {
+        "defaults": { "unit": "short" },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 12, "x": 12, "y": 4 },
+      "id": 7,
+      "options": { "colorMode": "none", "graphMode": "none", "textMode": "auto", "orientation": "horizontal" },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "timescaledb" },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  source_table AS \"Source\",\n  to_char(last_ingested_at, 'YYYY-MM-DD HH24:MI') AS \"Dernière ingestion\",\n  total_rows AS \"Lignes totales\",\n  ROUND(EXTRACT(EPOCH FROM age) / 3600, 0)::int AS \"Âge (h)\"\nFROM monitoring.mon__pipeline_freshness\nORDER BY source_table",
+          "refId": "A"
+        }
+      ],
+      "title": "Résumé des sources",
+      "type": "table"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "timescaledb" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "bars",
+            "lineWidth": 0,
+            "fillOpacity": 80,
+            "barAlignment": 0,
+            "barWidthFactor": 0.6
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 8 },
+      "id": 8,
+      "options": {
+        "legend": { "calcs": ["sum", "last"], "displayMode": "table", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "timescaledb" },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  period::timestamp AS time,\n  source AS metric,\n  SUM(row_count) AS value\nFROM monitoring.mon__row_counts\nGROUP BY period, source\nORDER BY time",
+          "refId": "A"
+        }
+      ],
+      "title": "Lignes ingérées par source et par période",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 17 },
+      "id": 20,
+      "title": "Qualité des données — Taux de NULL",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "timescaledb" },
+      "fieldConfig": {
+        "defaults": { "custom": { "align": "auto" } },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "null_rate_pct" },
+            "properties": [
+              { "id": "displayName", "value": "Taux NULL (%)" },
+              { "id": "unit", "value": "percent" },
+              { "id": "custom.displayMode", "value": "color-background" },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "green", "value": null },
+                    { "color": "yellow", "value": 5 },
+                    { "color": "orange", "value": 15 },
+                    { "color": "red", "value": 30 }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "null_count" },
+            "properties": [{ "id": "displayName", "value": "Lignes NULL" }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "total_rows" },
+            "properties": [{ "id": "displayName", "value": "Total lignes" }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "monitored_column" },
+            "properties": [{ "id": "displayName", "value": "Colonne" }]
+          }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 18 },
+      "id": 9,
+      "options": {
+        "footer": { "show": false },
+        "sortBy": [{ "desc": true, "displayName": "period" }]
+      },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "timescaledb" },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  source,\n  monitored_column,\n  period::date AS period,\n  total_rows,\n  null_count,\n  null_rate_pct\nFROM monitoring.mon__null_rates\nORDER BY period DESC, source\nLIMIT 24",
+          "refId": "A"
+        }
+      ],
+      "title": "Taux de NULL par colonne clé (24 dernières périodes)",
+      "type": "table"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "timescaledb" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2, "showPoints": "auto", "pointSize": 5 },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 26 },
+      "id": 10,
+      "options": {
+        "legend": { "calcs": ["last", "max"], "displayMode": "table", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "timescaledb" },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  period::timestamp AS time,\n  source || ' — ' || monitored_column AS metric,\n  null_rate_pct AS value\nFROM monitoring.mon__null_rates\nORDER BY time",
+          "refId": "A"
+        }
+      ],
+      "title": "Évolution du taux de NULL par source",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "5m",
+  "schemaVersion": 38,
+  "tags": ["sahel-flow", "monitoring", "pipeline", "data-quality"],
+  "templating": { "list": [] },
+  "time": { "from": "now-1y", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Sahel Flow — Pipeline Freshness",
+  "uid": "pipeline-freshness",
+  "version": 1
+}

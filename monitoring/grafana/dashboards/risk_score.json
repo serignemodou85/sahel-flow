@@ -1,0 +1,306 @@
+{
+  "annotations": { "list": [] },
+  "description": "Score de risque alimentaire mensuel — Zone UEMOA (SEN + CIV). Formule : 0.6 × price_trend_score + 0.4 × inflation_score",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "links": [],
+  "panels": [
+    {
+      "datasource": { "type": "postgres", "uid": "timescaledb" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2, "showPoints": "never" },
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 25 },
+              { "color": "orange", "value": 50 },
+              { "color": "red", "value": 75 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 0 },
+      "id": 1,
+      "options": {
+        "legend": { "calcs": ["last", "min", "max", "mean"], "displayMode": "table", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "timescaledb" },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  period::timestamp AS time,\n  risk_score AS \"SEN\"\nFROM marts.mart__risk__score_monthly\nWHERE country_code = 'SEN'\n  AND period::timestamp >= $__timeFrom()\n  AND period::timestamp <= $__timeTo()\nORDER BY time",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "postgres", "uid": "timescaledb" },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  period::timestamp AS time,\n  risk_score AS \"CIV\"\nFROM marts.mart__risk__score_monthly\nWHERE country_code = 'CIV'\n  AND period::timestamp >= $__timeFrom()\n  AND period::timestamp <= $__timeTo()\nORDER BY time",
+          "refId": "B"
+        }
+      ],
+      "title": "Risk Score mensuel — SEN vs CIV",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "timescaledb" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 25 },
+              { "color": "orange", "value": 50 },
+              { "color": "red", "value": 75 }
+            ]
+          },
+          "min": 0,
+          "max": 100,
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 8 },
+      "id": 2,
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+        "showThresholdLabels": true,
+        "showThresholdMarkers": true
+      },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "timescaledb" },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  NOW() AS time,\n  risk_score AS value\nFROM marts.mart__risk__score_monthly\nWHERE country_code = 'SEN'\nORDER BY period DESC\nLIMIT 1",
+          "refId": "A"
+        }
+      ],
+      "title": "Score actuel — SEN",
+      "type": "gauge"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "timescaledb" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 25 },
+              { "color": "orange", "value": 50 },
+              { "color": "red", "value": 75 }
+            ]
+          },
+          "min": 0,
+          "max": 100,
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 6, "w": 6, "x": 6, "y": 8 },
+      "id": 3,
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+        "showThresholdLabels": true,
+        "showThresholdMarkers": true
+      },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "timescaledb" },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  NOW() AS time,\n  risk_score AS value\nFROM marts.mart__risk__score_monthly\nWHERE country_code = 'CIV'\nORDER BY period DESC\nLIMIT 1",
+          "refId": "A"
+        }
+      ],
+      "title": "Score actuel — CIV",
+      "type": "gauge"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "timescaledb" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 25 },
+              { "color": "orange", "value": 50 },
+              { "color": "red", "value": 75 }
+            ]
+          },
+          "mappings": [
+            { "type": "range", "options": { "from": 0, "to": 24.99, "result": { "text": "LOW", "color": "green" } } },
+            { "type": "range", "options": { "from": 25, "to": 49.99, "result": { "text": "MEDIUM", "color": "yellow" } } },
+            { "type": "range", "options": { "from": 50, "to": 74.99, "result": { "text": "HIGH", "color": "orange" } } },
+            { "type": "range", "options": { "from": 75, "to": 100, "result": { "text": "CRITICAL", "color": "red" } } }
+          ]
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 8 },
+      "id": 4,
+      "options": { "colorMode": "background", "graphMode": "none", "textMode": "value" },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "timescaledb" },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  NOW() AS time,\n  MAX(CASE WHEN country_code = 'SEN' THEN risk_score END) AS \"SEN\",\n  MAX(CASE WHEN country_code = 'CIV' THEN risk_score END) AS \"CIV\"\nFROM marts.mart__risk__score_monthly\nWHERE period = (\n  SELECT MAX(period)\n  FROM marts.mart__risk__score_monthly\n)",
+          "refId": "A"
+        }
+      ],
+      "title": "Niveau de risque actuel",
+      "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 },
+      "id": 10,
+      "title": "Décomposition du score par pays",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "timescaledb" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2, "showPoints": "never" },
+          "min": 0,
+          "max": 100
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Risk Score (total)" },
+            "properties": [
+              { "id": "custom.lineWidth", "value": 3 },
+              { "id": "custom.lineStyle", "value": { "fill": "solid" } }
+            ]
+          }
+        ]
+      },
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 15 },
+      "id": 5,
+      "options": {
+        "legend": { "calcs": ["last", "mean"], "displayMode": "table", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "timescaledb" },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  period::timestamp AS time,\n  price_trend_score AS \"Tendance prix (×0.6)\",\n  inflation_score   AS \"Inflation (×0.4)\",\n  risk_score        AS \"Risk Score (total)\"\nFROM marts.mart__risk__score_monthly\nWHERE country_code = '${country}'\n  AND period::timestamp >= $__timeFrom()\n  AND period::timestamp <= $__timeTo()\nORDER BY time",
+          "refId": "A"
+        }
+      ],
+      "title": "Décomposition du score — ${country}",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "timescaledb" },
+      "fieldConfig": {
+        "defaults": { "custom": { "align": "auto" } },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "risk_score" },
+            "properties": [
+              { "id": "displayName", "value": "Risk Score" },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "green", "value": null },
+                    { "color": "yellow", "value": 25 },
+                    { "color": "orange", "value": 50 },
+                    { "color": "red", "value": 75 }
+                  ]
+                }
+              },
+              { "id": "custom.displayMode", "value": "color-background" }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "price_trend_score" },
+            "properties": [{ "id": "displayName", "value": "Tendance prix" }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "inflation_score" },
+            "properties": [{ "id": "displayName", "value": "Score inflation" }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "avg_price_usd" },
+            "properties": [
+              { "id": "displayName", "value": "Prix moy. USD" },
+              { "id": "unit", "value": "currencyUSD" }
+            ]
+          }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 24 },
+      "id": 6,
+      "options": { "footer": { "show": false } },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "timescaledb" },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  period,\n  risk_score,\n  price_trend_score,\n  inflation_score,\n  avg_price_usd,\n  inflation_rate\nFROM marts.mart__risk__score_monthly\nWHERE country_code = '${country}'\nORDER BY period DESC\nLIMIT 36",
+          "refId": "A"
+        }
+      ],
+      "title": "Historique du score (36 derniers mois) — ${country}",
+      "type": "table"
+    }
+  ],
+  "refresh": "5m",
+  "schemaVersion": 38,
+  "tags": ["sahel-flow", "risk-score", "securite-alimentaire"],
+  "templating": {
+    "list": [
+      {
+        "current": { "selected": true, "text": "SEN", "value": "SEN" },
+        "hide": 0,
+        "includeAll": false,
+        "label": "Pays",
+        "name": "country",
+        "options": [
+          { "selected": true, "text": "SEN", "value": "SEN" },
+          { "selected": false, "text": "CIV", "value": "CIV" }
+        ],
+        "query": "SEN,CIV",
+        "type": "custom"
+      }
+    ]
+  },
+  "time": { "from": "now-2y", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Sahel Flow — Risk Score",
+  "uid": "risk-score",
+  "version": 1
+}

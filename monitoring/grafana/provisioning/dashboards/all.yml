@@ -1,0 +1,12 @@
+apiVersion: 1
+
+# Grafana scanne ce dossier toutes les 10 secondes.
+# Tout fichier .json ajouté dans /var/lib/grafana/dashboards est automatiquement importé.
+providers:
+  - name: sahel-flow
+    type: file
+    disableDeletion: false      # permet de supprimer un dashboard depuis l'UI
+    updateIntervalSeconds: 10
+    allowUiUpdates: true        # les modifications dans l'UI sont sauvegardées dans le JSON
+    options:
+      path: /var/lib/grafana/dashboards

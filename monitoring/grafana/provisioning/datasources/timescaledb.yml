@@ -1,0 +1,19 @@
+apiVersion: 1
+
+# Grafana charge ce fichier au démarrage et crée la datasource automatiquement.
+# Aucun clic dans l'UI requis — reproductible sur toute machine qui lance docker-compose up.
+datasources:
+  - name: TimescaleDB
+    type: postgres
+    uid: timescaledb          # uid fixe référencé dans tous les JSON de dashboards
+    url: timescaledb:5432     # "timescaledb" = nom du service Docker sur sahel_net
+    database: sahel_flow
+    user: $POSTGRES_USER      # injecté depuis l'environment du container Grafana
+    secureJsonData:
+      password: $POSTGRES_PASSWORD
+    jsonData:
+      sslmode: disable
+      postgresVersion: 1500   # PostgreSQL 15
+      timescaledb: true       # active les optimisations time-series
+    editable: false
+    isDefault: true
