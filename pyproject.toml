@@ -2,5 +2,5 @@
 # "." dans pythonpath = le projet root est sur le PYTHONPATH.
 # Permet : from ingestion.sources.world_bank import WorldBankSource
 # Sans ça, pytest ne trouve pas les packages locaux.
-pythonpath = ["."]
-testpaths  = ["ingestion/tests"]
+pythonpath = [".", "api"]        # "api" permet : from app.main import app dans les tests API
+testpaths  = ["ingestion/tests", "api/tests"]

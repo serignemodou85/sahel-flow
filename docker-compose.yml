@@ -139,6 +139,28 @@ services:
         condition: service_completed_successfully
     command: scheduler
 
+  # ── 5. API FastAPI ────────────────────────────────────────────────────────────
+  # Expose les marts dbt via REST. Pattern : router → service → db.
+  # Build context = racine du projet pour accéder à shared/ dans le Dockerfile.
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    container_name: sahel_api
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+    ports:
+      - "8000:8000"                                # http://localhost:8000/docs
+    environment:
+      POSTGRES_HOST: timescaledb
+      POSTGRES_USER: ${POSTGRES_USER:-sahel}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sahel_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-sahel_flow}
+      POSTGRES_PORT: 5432
+    networks:
+      - sahel_net
+
 
 # ── Volumes nommés ─────────────────────────────────────────────────────────────
 volumes:
