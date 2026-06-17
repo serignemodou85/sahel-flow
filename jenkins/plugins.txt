@@ -4,3 +4,4 @@ docker-workflow
 credentials-binding
 junit
 ansicolor
+configuration-as-code

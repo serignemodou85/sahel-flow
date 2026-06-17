@@ -194,12 +194,15 @@ services:
       - "8082:8080"                                # UI Jenkins
       - "50000:50000"                              # port agents JNLP (si besoin futur)
     environment:
+      # Credentials DB — lus par casc.yaml au démarrage Jenkins pour créer le credential JCasC
       POSTGRES_USER: ${POSTGRES_USER:-sahel}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sahel_secret}
       POSTGRES_DB: ${POSTGRES_DB:-sahel_flow}
+      # Admin Jenkins — défini dans casc.yaml via ${JENKINS_ADMIN_PASSWORD}
+      JENKINS_ADMIN_PASSWORD: ${JENKINS_ADMIN_PASSWORD:-admin}
     volumes:
       - jenkins_data:/var/jenkins_home             # config, jobs, workspace Jenkins
-      - /var/run/docker.sock:/var/run/docker.sock  # socket mount pour docker build/run
+      - /var/run/docker.sock:/var/run/docker.sock  # socket mount — uniquement pour docker build (stage Build)
     networks:
       - sahel_net
 

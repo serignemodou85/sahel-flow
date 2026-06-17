@@ -1,4 +1,4 @@
-.PHONY: up down logs ps build db-only fernet-key
+.PHONY: up down logs ps build db-only fernet-key build-agent build-jenkins
 
 ## Démarre tous les services (build si l'image n'existe pas)
 up:
@@ -35,3 +35,12 @@ ps:
 ## Génère une clé Fernet pour Airflow (à copier dans .env)
 fernet-key:
 	python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+
+## Construit l'image agent Docker Jenkins — prérequis au premier lancement CI
+## À exécuter une fois après clone, ou quand jenkins/agent.Dockerfile change
+build-agent:
+	docker build -t sahel-agent:latest -f jenkins/agent.Dockerfile .
+
+## Rebuild l'image Jenkins controller — nécessaire si plugins.txt ou casc.yaml change
+build-jenkins:
+	docker compose build jenkins

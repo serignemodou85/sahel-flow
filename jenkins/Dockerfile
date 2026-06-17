@@ -19,7 +19,13 @@ RUN apt-get update && apt-get install -y \
     && groupadd -f docker \
     && usermod -aG docker jenkins
 
+# Plugins Jenkins (inclut configuration-as-code pour JCasC)
 COPY plugins.txt /usr/share/jenkins/ref/plugins.txt
 RUN jenkins-plugin-cli --plugin-file /usr/share/jenkins/ref/plugins.txt
+
+# JCasC — baked dans l'image hors du volume jenkins_home
+# Valeurs sensibles injectées depuis les env vars docker-compose au démarrage
+COPY casc.yaml /usr/share/jenkins/casc.yaml
+ENV CASC_JENKINS_CONFIG=/usr/share/jenkins/casc.yaml
 
 USER jenkins
