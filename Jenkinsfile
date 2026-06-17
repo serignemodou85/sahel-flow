@@ -1,13 +1,19 @@
 pipeline {
-    agent none   // chaque stage déclare son propre agent
+    agent none
 
     options {
         ansiColor('xterm')
         timestamps()
+        timeout(time: 30, unit: 'MINUTES')   // protège contre les builds bloqués
+    }
+
+    // Polling SCM toutes les ~5 min — se déclenche automatiquement sur commit détecté
+    triggers {
+        pollSCM('H/5 * * * *')
     }
 
     // Constantes sans dépendance au workspace — sûres à pipeline-level avec agent none.
-    // POSTGRES_USER + POSTGRES_PASSWORD viennent de withCredentials dans le stage Test.
+    // POSTGRES_USER + POSTGRES_PASSWORD viennent de withCredentials (stage Test).
     environment {
         POSTGRES_HOST = "timescaledb"
         POSTGRES_DB   = "sahel_flow"
@@ -16,61 +22,56 @@ pipeline {
 
     stages {
 
-        stage('Setup') {
-            agent { docker { image 'sahel-agent:latest' } }
-            steps {
-                sh '''
-                    python3 -m venv .venv
-                    .venv/bin/pip install --quiet --upgrade pip
-                    .venv/bin/pip install --quiet -r infra/airflow/requirements.txt
-                    .venv/bin/pip install --quiet -r api/requirements.txt
-                    .venv/bin/pip install --quiet "flake8==7.1.0"
-                '''
-            }
-        }
+        // Lint et Test sont indépendants — ils tournent simultanément après checkout.
+        // Les deps sont dans l'image sahel-agent:latest (baked via make build-agent).
+        // Pas de stage Setup : pas de venv, pas d'install à la volée.
+        stage('Quality') {
+            parallel {
 
-        stage('Lint') {
-            // Pas de socket — l'isolation est totale, flake8 n'a besoin d'aucun daemon
-            agent { docker { image 'sahel-agent:latest' } }
-            steps {
-                sh '.venv/bin/flake8 ingestion/ api/ shared/ dags/ apps/'
-            }
-        }
+                stage('Lint') {
+                    // Pas de socket, pas de réseau — isolation maximale
+                    agent { docker { image 'sahel-agent:latest' } }
+                    steps {
+                        sh 'flake8 ingestion/ api/ shared/ dags/ apps/'
+                    }
+                }
 
-        stage('Test') {
-            agent {
-                docker {
-                    image 'sahel-agent:latest'
-                    // sahel_net : accès à timescaledb. Pas de socket — pas de docker build ici.
-                    args  '--network sahel_net'
+                stage('Test') {
+                    agent {
+                        docker {
+                            image 'sahel-agent:latest'
+                            // sahel_net : accès à timescaledb. Pas de socket Docker.
+                            args  '--network sahel_net'
+                        }
+                    }
+                    steps {
+                        withCredentials([usernamePassword(
+                            credentialsId: 'timescaledb-creds',
+                            usernameVariable: 'POSTGRES_USER',
+                            passwordVariable: 'POSTGRES_PASSWORD'
+                        )]) {
+                            sh '''
+                                mkdir -p reports
+                                PYTHONPATH="${WORKSPACE}:${WORKSPACE}/api" \
+                                pytest ingestion/tests/ api/tests/ \
+                                    -v --tb=short \
+                                    --junitxml=reports/junit.xml
+                            '''
+                        }
+                    }
+                    post {
+                        always {
+                            // Publie les résultats dans l'UI Jenkins (courbes de tendance par build)
+                            junit 'reports/junit.xml'
+                        }
+                    }
                 }
-            }
-            steps {
-                // Credentials injectés depuis Jenkins (JCasC) — masqués dans les logs
-                withCredentials([usernamePassword(
-                    credentialsId: 'timescaledb-creds',
-                    usernameVariable: 'POSTGRES_USER',
-                    passwordVariable: 'POSTGRES_PASSWORD'
-                )]) {
-                    sh '''
-                        mkdir -p reports
-                        PYTHONPATH="${WORKSPACE}:${WORKSPACE}/api" \
-                        .venv/bin/pytest ingestion/tests/ api/tests/ \
-                            -v --tb=short \
-                            --junitxml=reports/junit.xml
-                    '''
-                }
-            }
-            post {
-                always {
-                    // Publie les résultats dans l'UI Jenkins même si des tests échouent
-                    junit 'reports/junit.xml'
-                }
+
             }
         }
 
         stage('Build') {
-            // agent any = controller Jenkins — accès au socket Docker via volume mount
+            // agent any = controller Jenkins — socket Docker disponible via volume mount
             agent any
             steps {
                 sh 'docker build -t sahel-api:${BUILD_NUMBER} -f api/Dockerfile .'
@@ -80,6 +81,10 @@ pipeline {
     }
 
     post {
+        always {
+            // Le workspace est physiquement sur le controller — accessible depuis le post pipeline-level
+            archiveArtifacts artifacts: 'reports/junit.xml', allowEmptyArchive: true
+        }
         success {
             echo "Pipeline réussi — build #${BUILD_NUMBER}"
         }
