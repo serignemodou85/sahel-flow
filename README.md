@@ -16,7 +16,7 @@ Pipeline de données de bout en bout : ingestion → transformation → API REST
 | API | FastAPI + psycopg2 | Endpoints REST consommant les marts |
 | Monitoring | Grafana 10 | Dashboards prix, inflation, risk score, pipeline |
 | Vitrine | Streamlit | App analytics consommant l'API FastAPI |
-| CI/CD | Jenkins | *(Phase 4 — en cours)* |
+| CI/CD | Jenkins LTS + Docker CLI | Lint (flake8) + Tests (pytest) + Build Docker |
 
 ---
 
@@ -95,6 +95,7 @@ docker compose up -d
 | FastAPI | http://localhost:8000/docs | Swagger UI — tous les endpoints |
 | Grafana | http://localhost:3000 | Dashboards (anonyme ou admin / admin) |
 | Streamlit | http://localhost:8501 | Vitrine analytics |
+| Jenkins | http://localhost:8082 | CI/CD — pipeline lint → tests → build |
 
 ### Démarrer uniquement la base de données
 
@@ -200,5 +201,5 @@ Provisionnés automatiquement au démarrage — aucune configuration manuelle re
 - [x] Phase 1 — Pipeline de données (18 tests)
 - [x] Phase 2 — API FastAPI (10 tests)
 - [x] Phase 3 — Monitoring Grafana + Streamlit
-- [ ] Phase 4 — Jenkins CI/CD
+- [x] Phase 4 — Jenkins CI/CD (Groupe 1 : service + Jenkinsfile)
 - [ ] Phase 5 (prevue) — Prometheus, JWT, déploiement cloud

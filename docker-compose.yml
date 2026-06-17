@@ -178,7 +178,32 @@ services:
     networks:
       - sahel_net
 
-  # ── 7. Grafana ────────────────────────────────────────────────────────────────
+  # ── 7. Jenkins ────────────────────────────────────────────────────────────────
+  # CI/CD : lint (flake8) + tests (pytest) + build Docker.
+  # Socket mount = accès au Docker daemon de l'hôte sans DinD ni --privileged.
+  # Credentials DB injectés via environment pour que pytest puisse contacter timescaledb.
+  # UI : http://localhost:8082
+  jenkins:
+    build:
+      context: jenkins
+    container_name: sahel_jenkins
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+    ports:
+      - "8082:8080"                                # UI Jenkins
+      - "50000:50000"                              # port agents JNLP (si besoin futur)
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-sahel}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sahel_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-sahel_flow}
+    volumes:
+      - jenkins_data:/var/jenkins_home             # config, jobs, workspace Jenkins
+      - /var/run/docker.sock:/var/run/docker.sock  # socket mount pour docker build/run
+    networks:
+      - sahel_net
+
+  # ── 8. Grafana ────────────────────────────────────────────────────────────────
   # Dashboards de monitoring : prix alimentaires, inflation, risk score.
   # Provisioning automatique via fichiers montés — aucun clic, tout est versionné.
   # UI : http://localhost:3000  (login admin / valeur de GRAFANA_PASSWORD)
@@ -210,6 +235,7 @@ volumes:
   timescaledb_data:   # données PostgreSQL / TimescaleDB
   airflow_logs:       # logs des tâches Airflow
   grafana_data:       # dashboards, alertes et préférences Grafana
+  jenkins_data:       # config, jobs et workspace Jenkins
 
 # ── Réseau interne ─────────────────────────────────────────────────────────────
 # Les containers se parlent par nom de service (ex: host "timescaledb" pour PostgreSQL).
