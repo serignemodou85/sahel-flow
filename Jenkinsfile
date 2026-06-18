@@ -39,9 +39,11 @@ pipeline {
                 stage('Test') {
                     agent {
                         docker {
-                            image 'sahel-agent:latest'
-                            // sahel_net : accès à timescaledb. Pas de socket Docker.
-                            args  '--network sahel_net'
+                            image   'sahel-agent:latest'
+                            // Nom réel du réseau Docker Compose : {projet}_{réseau}
+                            // "sahel-flow" = nom du répertoire racine (COMPOSE_PROJECT_NAME)
+                            // Pas de socket — uniquement l'accès réseau à timescaledb:5432
+                            network 'sahel-flow_sahel_net'
                         }
                     }
                     steps {
