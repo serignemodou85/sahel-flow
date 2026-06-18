@@ -1,19 +1,23 @@
+// Charge vars/ depuis le même checkout que ce Jenkinsfile.
+// legacySCM(scm) = même SCM que le job courant — zéro dépendance réseau externe.
+// La version '@main' est ignorée quand legacySCM est utilisé : c'est le workspace
+// courant qui est lu, quelle que soit la branche buildée.
+library identifier: 'sahel-flow@main',
+        retriever: legacySCM(scm)
+
 pipeline {
     agent none
 
     options {
         ansiColor('xterm')
         timestamps()
-        timeout(time: 30, unit: 'MINUTES')   // protège contre les builds bloqués
+        timeout(time: 30, unit: 'MINUTES')
     }
 
-    // Polling SCM toutes les ~5 min — se déclenche automatiquement sur commit détecté
     triggers {
         pollSCM('H/5 * * * *')
     }
 
-    // Constantes sans dépendance au workspace — sûres à pipeline-level avec agent none.
-    // POSTGRES_USER + POSTGRES_PASSWORD viennent de withCredentials (stage Test).
     environment {
         POSTGRES_HOST = "timescaledb"
         POSTGRES_DB   = "sahel_flow"
@@ -22,19 +26,12 @@ pipeline {
 
     stages {
 
-        // Lint et Test sont indépendants — ils tournent simultanément après checkout.
-        // Les deps sont dans l'image sahel-agent:latest (baked via make build-agent).
-        // Pas de stage Setup : pas de venv, pas d'install à la volée.
         stage('Quality') {
             parallel {
 
                 stage('Lint') {
-                    // Pas de socket, pas de réseau — isolation maximale
                     agent { docker { image 'sahel-agent:latest' } }
                     environment {
-                        // Dirige le cache pre-commit vers /tmp — writable sans problème de permissions.
-                        // Ne persiste pas entre builds (container éphémère) — acceptable en portfolio.
-                        // En prod : monter un volume cache dédié pour éviter les téléchargements répétés.
                         PRE_COMMIT_HOME = '/tmp/pre-commit-cache'
                     }
                     steps {
@@ -46,9 +43,6 @@ pipeline {
                     agent {
                         docker {
                             image   'sahel-agent:latest'
-                            // Nom réel du réseau Docker Compose : {projet}_{réseau}
-                            // "sahel-flow" = nom du répertoire racine (COMPOSE_PROJECT_NAME)
-                            // Pas de socket — uniquement l'accès réseau à timescaledb:5432
                             network 'sahel-flow_sahel_net'
                         }
                     }
@@ -69,7 +63,6 @@ pipeline {
                     }
                     post {
                         always {
-                            // Publie les résultats dans l'UI Jenkins (courbes de tendance par build)
                             junit 'reports/junit.xml'
                         }
                     }
@@ -78,19 +71,21 @@ pipeline {
             }
         }
 
+        // Build uniquement sur main — les images Docker des branches feature
+        // ne seront jamais déployées, les builder serait du gaspillage.
         stage('Build') {
-            // agent any = controller Jenkins — socket Docker disponible via volume mount
+            when { branch 'main' }
             agent any
             steps {
-                sh 'docker build -t sahel-api:${BUILD_NUMBER} -f api/Dockerfile .'
-                sh 'docker build -t sahel-streamlit:${BUILD_NUMBER} -f apps/streamlit/Dockerfile apps/streamlit/'
+                buildDockerImage('sahel-api',       'api/Dockerfile',            '.')
+                buildDockerImage('sahel-streamlit', 'apps/streamlit/Dockerfile', 'apps/streamlit/')
             }
         }
+
     }
 
     post {
         always {
-            // Le workspace est physiquement sur le controller — accessible depuis le post pipeline-level
             archiveArtifacts artifacts: 'reports/junit.xml', allowEmptyArchive: true
         }
         success {

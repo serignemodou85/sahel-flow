@@ -19,3 +19,30 @@ credentials:
               description: "TimescaleDB — sahel_flow"
               username: "${POSTGRES_USER}"
               password: "${POSTGRES_PASSWORD}"
+
+# Crée le job Multibranch Pipeline au démarrage Jenkins.
+# Scanne le repo toutes les 5 min — découvre les branches automatiquement.
+# Supprime les pipelines dont la branche est supprimée (orphanedItemStrategy).
+jobs:
+  - script: |
+      multibranchPipelineJob('sahel-flow') {
+        branchSources {
+          git {
+            id('sahel-flow-git')
+            remote('https://github.com/serignemodou85/sahel-flow.git')
+          }
+        }
+        factory {
+          workflowBranchProjectFactory {
+            scriptPath('Jenkinsfile')
+          }
+        }
+        orphanedItemStrategy {
+          discardOldItems {
+            numToKeep(10)
+          }
+        }
+        triggers {
+          periodic(5)
+        }
+      }

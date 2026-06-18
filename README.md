@@ -201,5 +201,5 @@ Provisionnés automatiquement au démarrage — aucune configuration manuelle re
 - [x] Phase 1 — Pipeline de données (18 tests)
 - [x] Phase 2 — API FastAPI (10 tests)
 - [x] Phase 3 — Monitoring Grafana + Streamlit
-- [x] Phase 4 — Jenkins CI/CD (Groupes 1-4 : service, agents Docker, JCasC, parallélisation, pre-commit)
+- [x] Phase 4 — Jenkins CI/CD (Groupes 1-5 : service, agents Docker, JCasC, parallélisation, pre-commit, shared lib, multibranch)
 - [ ] Phase 5 (prevue) — Prometheus, JWT, déploiement cloud

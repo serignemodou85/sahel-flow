@@ -5,3 +5,4 @@ credentials-binding
 junit
 ansicolor
 configuration-as-code
+job-dsl
