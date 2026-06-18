@@ -1,4 +1,4 @@
-.PHONY: up down logs ps build db-only fernet-key build-agent build-jenkins
+.PHONY: up down logs ps build db-only fernet-key build-agent build-jenkins pre-commit-install
 
 ## Démarre tous les services (build si l'image n'existe pas)
 up:
@@ -44,3 +44,7 @@ build-agent:
 ## Rebuild l'image Jenkins controller — nécessaire si plugins.txt ou casc.yaml change
 build-jenkins:
 	docker compose build jenkins
+
+## Installe le hook pre-commit dans .git/hooks/pre-commit (à faire une fois après clone)
+pre-commit-install:
+	pre-commit install

@@ -12,4 +12,5 @@ COPY api/requirements.txt           /tmp/api-requirements.txt
 RUN pip install --no-cache-dir \
     -r /tmp/ingestion-requirements.txt \
     -r /tmp/api-requirements.txt \
-    "flake8==7.1.0"
+    "flake8==7.1.0" \
+    "pre-commit"

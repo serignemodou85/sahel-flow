@@ -31,8 +31,14 @@ pipeline {
                 stage('Lint') {
                     // Pas de socket, pas de réseau — isolation maximale
                     agent { docker { image 'sahel-agent:latest' } }
+                    environment {
+                        // Dirige le cache pre-commit vers /tmp — writable sans problème de permissions.
+                        // Ne persiste pas entre builds (container éphémère) — acceptable en portfolio.
+                        // En prod : monter un volume cache dédié pour éviter les téléchargements répétés.
+                        PRE_COMMIT_HOME = '/tmp/pre-commit-cache'
+                    }
                     steps {
-                        sh 'flake8 ingestion/ api/ shared/ dags/ apps/'
+                        sh 'pre-commit run --all-files'
                     }
                 }
 
