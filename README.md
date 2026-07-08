@@ -13,8 +13,8 @@ Pipeline de données de bout en bout : ingestion → transformation → API REST
 | Stockage | TimescaleDB (PostgreSQL 15) | Data warehouse + metadata Airflow |
 | Orchestration | Apache Airflow (LocalExecutor) | DAGs d'ingestion mensuelle + dbt |
 | Transformation | dbt | raw → core → marts → monitoring |
-| API | FastAPI + psycopg2 | Endpoints REST consommant les marts |
-| Monitoring | Grafana 10 | Dashboards prix, inflation, risk score, pipeline |
+| API | FastAPI + psycopg2 | Endpoints REST protégés par JWT (HS256) |
+| Observabilité | Prometheus + Grafana 10 | Métriques RED + dashboards provisionnés |
 | Vitrine | Streamlit | App analytics consommant l'API FastAPI |
 | CI/CD | Jenkins LTS + Docker CLI | Lint (flake8) + Tests (pytest) + Build Docker |
 
@@ -46,10 +46,11 @@ World Bank API      WFP VAM API
     raw → core → marts
                 │
          ┌──────┴──────────────┐
-         │                     │
-      FastAPI               Grafana
-  /v1/risk-score         (4 dashboards,
-  /v1/food-prices         provisioning auto)
+         │                     │                    │
+      FastAPI               Grafana           Prometheus
+  /v1/auth/token       (5 dashboards,       ← /metrics
+  /v1/risk-score        provisioning         (RED metrics)
+  /v1/food-prices       auto)
   /v1/inflation
   /v1/compare
          │
@@ -94,6 +95,7 @@ docker compose up -d
 | Airflow | http://localhost:8080 | Orchestration DAGs (admin / admin) |
 | FastAPI | http://localhost:8000/docs | Swagger UI — tous les endpoints |
 | Grafana | http://localhost:3000 | Dashboards (anonyme ou admin / admin) |
+| Prometheus | http://localhost:9090 | Métriques RED — targets + alertes |
 | Streamlit | http://localhost:8501 | Vitrine analytics |
 | Jenkins | http://localhost:8082 | CI/CD — pipeline lint → tests → build |
 
@@ -109,7 +111,7 @@ make db-only
 python -m pytest ingestion/tests/ api/tests/ -v
 ```
 
-28 tests — 18 ingestion + 10 API.
+33 tests — 18 ingestion + 15 API (dont 5 auth JWT).
 
 ---
 
@@ -132,7 +134,12 @@ sahel-flow/
 │   │   ├── routers/           # 6 endpoints : health, countries, food-prices, inflation, risk-score, compare
 │   │   ├── services/          # Logique SQL isolée du router
 │   │   └── schemas/           # Modèles Pydantic
-│   └── tests/                 # 10 tests (TestClient + dependency_overrides)
+│   ├── app/
+│   │   ├── auth/              # JWT : schemas, service (OAuth2PasswordBearer), router
+│   │   ├── routers/           # 7 endpoints : health, auth, countries, food-prices, inflation, risk-score, compare
+│   │   ├── services/          # Logique SQL isolée du router
+│   │   └── schemas/           # Modèles Pydantic
+│   └── tests/                 # 15 tests (TestClient + dependency_overrides)
 ├── monitoring/
 │   └── grafana/
 │       ├── provisioning/      # Datasource + dashboard auto-provisionnés au démarrage
@@ -154,15 +161,16 @@ sahel-flow/
 
 ## API — Endpoints disponibles
 
-| Méthode | Endpoint | Description |
-|---|---|---|
-| GET | `/v1/health` | Statut API + DB |
-| GET | `/v1/metrics` | Version + uptime |
-| GET | `/v1/countries` | Pays disponibles (SEN, CIV) |
-| GET | `/v1/food-prices` | Prix alimentaires mensuels par commodité |
-| GET | `/v1/inflation` | Indicateurs macro annuels (World Bank) |
-| GET | `/v1/risk-score` | Score de risque mensuel 0–100 |
-| GET | `/v1/compare` | Comparaison SEN vs CIV sur une même période |
+| Méthode | Endpoint | Auth | Description |
+|---|---|---|---|
+| GET | `/v1/health` | Public | Statut API + DB |
+| GET | `/v1/metrics` | Public | Version + uptime |
+| GET | `/v1/countries` | Public | Pays disponibles (SEN, CIV) |
+| POST | `/v1/auth/token` | Public | OAuth2 password grant → JWT Bearer 30 min |
+| GET | `/v1/food-prices` | JWT | Prix alimentaires mensuels par commodité |
+| GET | `/v1/inflation` | JWT | Indicateurs macro annuels (World Bank) |
+| GET | `/v1/risk-score` | JWT | Score de risque mensuel 0–100 |
+| GET | `/v1/compare` | JWT | Comparaison SEN vs CIV sur une même période |
 
 Documentation interactive : http://localhost:8000/docs
 
@@ -172,12 +180,13 @@ Documentation interactive : http://localhost:8000/docs
 
 Provisionnés automatiquement au démarrage — aucune configuration manuelle requise.
 
-| Dashboard | Source dbt | Contenu |
+| Dashboard | Source | Contenu |
 |---|---|---|
-| Prix Alimentaires | `mart__food__prices_monthly` | Évolution des prix, marchés actifs, drill-down par pays |
-| Inflation | `mart__macro__indicators_annual` | Taux FP.CPI.TOTL.ZG SEN vs CIV, variation YoY |
-| Risk Score | `mart__risk__score_monthly` | Score mensuel, jauge actuelle, décomposition |
-| Pipeline Freshness | `mon__pipeline_freshness` + `mon__null_rates` + `mon__row_counts` | Fraîcheur, volume, qualité des données |
+| Prix Alimentaires | `mart__food__prices_monthly` (TimescaleDB) | Évolution des prix, marchés actifs, drill-down par pays |
+| Inflation | `mart__macro__indicators_annual` (TimescaleDB) | Taux FP.CPI.TOTL.ZG SEN vs CIV, variation YoY |
+| Risk Score | `mart__risk__score_monthly` (TimescaleDB) | Score mensuel, jauge actuelle, décomposition |
+| Pipeline Freshness | `mon__pipeline_freshness` + `mon__null_rates` (TimescaleDB) | Fraîcheur, volume, qualité des données |
+| API Performance | `/metrics` (Prometheus) | Taux req/s, latence P95, erreurs 5xx, total par endpoint |
 
 ---
 
@@ -202,4 +211,8 @@ Provisionnés automatiquement au démarrage — aucune configuration manuelle re
 - [x] Phase 2 — API FastAPI (10 tests)
 - [x] Phase 3 — Monitoring Grafana + Streamlit
 - [x] Phase 4 — Jenkins CI/CD (Groupes 1-5 : service, agents Docker, JCasC, parallélisation, pre-commit, shared lib, multibranch)
-- [ ] Phase 5 (prevue) — Prometheus, JWT, déploiement cloud
+- [ ] Phase 5 — Observabilité + Sécurité + Déploiement
+  - [x] Étape 33 — Prometheus (métriques RED, dashboard API Performance)
+  - [x] Étape 34 — JWT (OAuth2 password grant, HS256, 15 tests)
+  - [ ] Étape 35 — Déploiement Render + Supabase
+  - [ ] Étape 37 — Scraping BCEAO HTML
