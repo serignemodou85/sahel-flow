@@ -23,6 +23,12 @@ class Settings(BaseSettings):
     # Inscription : https://api.wfpvam.org (voir .env.example)
     wfp_api_key: str = ""
 
+    # ── Database URL override ────────────────────────────────────────────────
+    # Optionnel : si défini, prend priorité sur les 5 vars postgres_* séparées.
+    # Usage cloud : DATABASE_URL_OVERRIDE=postgresql://user:pass@host:5432/db
+    # (Supabase fournit cette string directement dans ses paramètres de connexion)
+    database_url_override: str | None = None
+
     # ── Auth ─────────────────────────────────────────────────────────────────
     # Valeurs dev faibles — OBLIGATOIRE de les surcharger en production via .env
     jwt_secret_key: str = "dev_secret_change_in_production"
@@ -37,6 +43,8 @@ class Settings(BaseSettings):
     # Property plutôt que champ : calculée à la demande, jamais stockée en clair.
     @property
     def database_url(self) -> str:
+        if self.database_url_override:
+            return self.database_url_override
         return (
             f"postgresql+psycopg2://{self.postgres_user}:{self.postgres_password}"
             f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"

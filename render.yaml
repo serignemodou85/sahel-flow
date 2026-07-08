@@ -1,0 +1,31 @@
+services:
+  # ── API FastAPI ─────────────────────────────────────────────────────────────
+  - type: web
+    name: sahel-api
+    env: docker
+    dockerfilePath: ./api/Dockerfile
+    dockerContext: .
+    plan: free
+    envVars:
+      - key: DATABASE_URL_OVERRIDE
+        sync: false          # valeur saisie manuellement dans le dashboard Render
+      - key: JWT_SECRET_KEY
+        sync: false
+      - key: API_USERNAME
+        sync: false
+      - key: API_PASSWORD
+        sync: false
+
+  # ── Vitrine Streamlit ───────────────────────────────────────────────────────
+  - type: web
+    name: sahel-streamlit
+    env: docker
+    dockerfilePath: ./apps/streamlit/Dockerfile
+    dockerContext: ./apps/streamlit
+    plan: free
+    envVars:
+      - key: API_BASE_URL
+        fromService:
+          name: sahel-api
+          type: web
+          property: url      # url = https://sahel-api.onrender.com (avec schéma)

@@ -14,15 +14,18 @@ def init_pool() -> None:
     """
     global _pool
     s = get_settings()
-    _pool = pg_pool.ThreadedConnectionPool(
-        minconn=1,
-        maxconn=5,
-        host=s.postgres_host,
-        port=s.postgres_port,
-        dbname=s.postgres_db,
-        user=s.postgres_user,
-        password=s.postgres_password,
-    )
+    if s.database_url_override:
+        _pool = pg_pool.ThreadedConnectionPool(1, 5, dsn=s.database_url_override)
+    else:
+        _pool = pg_pool.ThreadedConnectionPool(
+            minconn=1,
+            maxconn=5,
+            host=s.postgres_host,
+            port=s.postgres_port,
+            dbname=s.postgres_db,
+            user=s.postgres_user,
+            password=s.postgres_password,
+        )
 
 
 def close_pool() -> None:

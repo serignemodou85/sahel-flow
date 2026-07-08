@@ -13,4 +13,4 @@ COPY api/app/ app/
 # PYTHONPATH=/ permet à Python de résoudre "shared.config" → /shared/config.py
 ENV PYTHONPATH=/
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

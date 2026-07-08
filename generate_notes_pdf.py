@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Génère sahel-flow-notes.pdf — Phase 1 à Phase 4."""
+"""Génère sahel-flow-notes.pdf — Phase 1 à Phase 5."""
 
 import os
 from fpdf import FPDF
@@ -64,7 +64,7 @@ class SahelPDF(FPDF):
         self.set_y(8)
         self._f("I", 8)
         self.set_text_color(*GRAY)
-        self.cell(0, 4, "sahel-flow — Notes de compréhension Phase 1 à Phase 4", align="C")
+        self.cell(0, 4, "sahel-flow — Notes de compréhension Phase 1 à Phase 5", align="C")
         self.set_draw_color(*ACCENT)
         self.set_line_width(0.25)
         self.line(LM, 13.5, 210 - RM, 13.5)
@@ -96,17 +96,17 @@ class SahelPDF(FPDF):
 
         self._f("", 13)
         self.set_text_color(190, 215, 240)
-        self.cell(0, 8, "Notes de compréhension — Phase 1 à Phase 4",
+        self.cell(0, 8, "Notes de compréhension — Phase 1 à Phase 5",
                   align="C", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         self.ln(3)
         self._f("I", 10)
         self.set_text_color(160, 190, 220)
         self.cell(0, 6,
-                  "Pipeline complet : Ingestion -> dbt -> FastAPI -> Grafana + Streamlit -> Jenkins CI/CD",
+                  "Pipeline : Ingestion -> dbt -> FastAPI (JWT) -> Grafana + Prometheus + Streamlit -> Jenkins",
                   align="C", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
         # Phase summary table
-        self.set_y(105)
+        self.set_y(100)
         phases = [
             ("Phase 1", "Pipeline de données",
              "Docker Compose, TimescaleDB, Airflow, dbt, Tests (18 tests)"),
@@ -116,6 +116,8 @@ class SahelPDF(FPDF):
              "Grafana (provisioning as code), Streamlit (5 pages)"),
             ("Phase 4", "Jenkins CI/CD",
              "Agents Docker, JCasC, pre-commit, Shared Library, Multibranch"),
+            ("Phase 5", "Securite + Cloud",
+             "Prometheus RED, JWT OAuth2 (HS256), Render + Supabase (en cours)"),
         ]
         for tag, title, desc in phases:
             y = self.get_y()
@@ -141,7 +143,7 @@ class SahelPDF(FPDF):
         self.set_y(260)
         self._f("", 9)
         self.set_text_color(*GRAY)
-        self.cell(0, 5, "28 tests en vert -- Juin 2026", align="C")
+        self.cell(0, 5, "33 tests en vert -- Juillet 2026", align="C")
 
     # ── Block elements ────────────────────────────────────────────────────────
     def phase_header(self, title):
@@ -1203,6 +1205,157 @@ def build(p: SahelPDF):
         "-- reproductible, versionné, reviewable comme tout autre code."
     )
 
+    # ══════════════════════════════════════════════════════════════════════
+    # PHASE 5 — Securite + Observabilite + Deploiement
+    # ══════════════════════════════════════════════════════════════════════
+    p.phase_header("Phase 5 — Securite + Observabilite + Deploiement (en cours)")
+
+    # ── 5.1 Prometheus ────────────────────────────────────────────────────
+    p.section("5.1  Prometheus (etape 33) : metriques RED sur l'API FastAPI")
+    p.label("Ce qu'il faut comprendre :")
+    p.body(
+        "Prometheus collecte des metriques en 'scrappant' l'API toutes les 15s. "
+        "prometheus-fastapi-instrumentator instrumente automatiquement FastAPI : "
+        "il intercepte chaque requete et expose les compteurs au format OpenMetrics "
+        "sur le endpoint /metrics (distinct du /v1/metrics JSON existant)."
+    )
+    p.code(
+        "# api/app/main.py -- wiring Prometheus\n"
+        "from prometheus_fastapi_instrumentator import Instrumentator\n"
+        "\n"
+        "Instrumentator(\n"
+        "    should_group_status_codes=False,   # 200, 404, 500 -- pas 2xx, 4xx\n"
+        "    excluded_handlers=[\"/metrics\"],   # evite auto-scrape\n"
+        ").instrument(app).expose(app)           # ajoute GET /metrics\n"
+        "\n"
+        "# infra/prometheus/prometheus.yml\n"
+        "scrape_configs:\n"
+        "  - job_name: 'sahel-api'\n"
+        "    static_configs:\n"
+        "      - targets: ['api:8000']   # nom service Docker sur sahel_net\n"
+        "    metrics_path: '/metrics'\n"
+        "    scrape_interval: 15s"
+    )
+    p.label("Le pattern RED -- les 3 metriques suffisantes pour un service HTTP :")
+    p.bullets([
+        "Rate : sum(rate(http_requests_total[5m])) by (handler)  --> req/s par endpoint.",
+        "Errors : sum(rate(http_requests_total{status_code=~'5..'}[5m])) by (handler).",
+        "Duration P95 : histogram_quantile(0.95, sum(rate("
+        "http_request_duration_seconds_bucket[5m])) by (handler, le)) * 1000  --> ms.",
+    ])
+    p.body(
+        "Grafana dashboard api_performance.json (4 panels) : taux req/s, latence P95, "
+        "erreurs 5xx, total par endpoint. La datasource Prometheus a un uid fixe "
+        "'prometheus' -- reference dans le JSON du dashboard. "
+        "Si l'uid change, tous les panels perdent leur source."
+    )
+    p.retenir(
+        "should_group_status_codes=False : code exact dans la label (200, 404, 500). "
+        "Avec True : groupes 2xx/4xx/5xx -- impossible de distinguer un 401 d'un 404. "
+        "rate() = taux moyen sur la fenetre (stable pour les dashboards). "
+        "irate() = taux instantane entre les 2 derniers points (pour les alertes). "
+        "histogram_quantile() est une approximation -- sa precision depend des buckets."
+    )
+
+    p.sep()
+
+    # ── 5.2 JWT Auth ──────────────────────────────────────────────────────
+    p.section("5.2  JWT Auth (etape 34) : OAuth2 password grant + HS256")
+    p.label("Le flow complet :")
+    p.bullets([
+        "Client : POST /v1/auth/token avec username + password (form-urlencoded).",
+        "API : verifie credentials avec secrets.compare_digest, signe un JWT HS256 30 min.",
+        "Client : stocke le token, envoie Authorization: Bearer <token> sur chaque requete.",
+        "API : get_current_user() valide la signature, extrait le 'sub', autorise la route.",
+    ])
+    p.code(
+        "# api/app/auth/service.py\n"
+        "from jose import jwt, JWTError\n"
+        "from fastapi.security import OAuth2PasswordBearer\n"
+        "\n"
+        "ALGORITHM = 'HS256'\n"
+        "ACCESS_TOKEN_EXPIRE_MINUTES = 30\n"
+        "oauth2_scheme = OAuth2PasswordBearer(tokenUrl='/v1/auth/token')\n"
+        "\n"
+        "def create_access_token(username: str) -> str:\n"
+        "    expire = datetime.now(timezone.utc) + timedelta(minutes=30)\n"
+        "    return jwt.encode(\n"
+        "        {'sub': username, 'exp': expire},\n"
+        "        get_settings().jwt_secret_key,\n"
+        "        algorithm=ALGORITHM,\n"
+        "    )\n"
+        "\n"
+        "def get_current_user(token: str = Depends(oauth2_scheme)) -> str:\n"
+        "    try:\n"
+        "        payload = jwt.decode(token, get_settings().jwt_secret_key,\n"
+        "                             algorithms=[ALGORITHM])\n"
+        "        username = payload.get('sub')\n"
+        "        if username != get_settings().api_username:\n"
+        "            raise HTTPException(401)\n"
+        "    except JWTError:\n"
+        "        raise HTTPException(401)\n"
+        "    return username"
+    )
+    p.code(
+        "# api/app/routers/auth.py -- endpoint qui delivre le token\n"
+        "import secrets\n"
+        "\n"
+        "@router.post('/auth/token', response_model=Token)\n"
+        "def login(form_data: OAuth2PasswordRequestForm = Depends()) -> Token:\n"
+        "    s = get_settings()\n"
+        "    # compare_digest = temps constant (anti timing attack)\n"
+        "    valid = (secrets.compare_digest(form_data.username, s.api_username)\n"
+        "             and secrets.compare_digest(form_data.password, s.api_password))\n"
+        "    if not valid:\n"
+        "        raise HTTPException(401, detail='Identifiants incorrects')\n"
+        "    return Token(\n"
+        "        access_token=create_access_token(form_data.username),\n"
+        "        token_type='bearer',\n"
+        "    )\n"
+        "\n"
+        "# api/app/routers/food_prices.py -- protection au niveau router\n"
+        "router = APIRouter(\n"
+        "    tags=['food-prices'],\n"
+        "    dependencies=[Depends(get_current_user)],  # toutes les routes protegees\n"
+        ")"
+    )
+    p.label("Pourquoi router-level et non per-endpoint :")
+    p.body(
+        "Avec dependencies=[Depends(get_current_user)] sur l'APIRouter, chaque "
+        "nouveau endpoint ajoute au router est automatiquement protege. "
+        "Pas de risque d'oubli. La ligne de securite est declaree une seule fois."
+    )
+    p.label("Strategie de tests :")
+    p.code(
+        "# conftest.py -- fixture existante mise a jour\n"
+        "app.dependency_overrides[get_current_user] = lambda: 'test-user'\n"
+        "# -> les tests existants passent sans token (auth bypassee)\n"
+        "\n"
+        "# test_auth.py -- fixture sans override (teste vraiment l'auth)\n"
+        "@pytest.fixture\n"
+        "def raw_client():\n"
+        "    with TestClient(app) as c:\n"
+        "        yield c\n"
+        "\n"
+        "def test_protected_no_token(raw_client):\n"
+        "    assert raw_client.get('/v1/food-prices?country=SEN').status_code == 401\n"
+        "\n"
+        "def test_login_returns_token(raw_client):\n"
+        "    resp = raw_client.post('/v1/auth/token',\n"
+        "        data={'username': 'admin', 'password': 'change_me_in_production'})\n"
+        "    assert resp.status_code == 200\n"
+        "    assert 'access_token' in resp.json()"
+    )
+    p.retenir(
+        "secrets.compare_digest : compare en temps constant -- meme duree si "
+        "le mot de passe est bon ou mauvais. Empeche les timing attacks "
+        "(deviner le mot de passe en mesurant le temps de reponse). "
+        "Pas de bcrypt ici : le password est deja en clair dans .env -- "
+        "bcrypt ne protege que si la DB est compromise, pas le .env. "
+        "sub (subject) = claim standard RFC 7519. Toujours mettre l'identifiant "
+        "utilisateur dans 'sub', pas dans un champ custom."
+    )
+
     # ── Page finale ───────────────────────────────────────────────────────
     p.add_page()
     p.set_y(90)
@@ -1215,11 +1368,11 @@ def build(p: SahelPDF):
     p.set_y(100)
     p._f("B", 16)
     p.set_text_color(*WHITE)
-    p.cell(0, 10, "28 tests en vert.", align="C",
+    p.cell(0, 10, "33 tests en vert.", align="C",
            new_x=XPos.LMARGIN, new_y=YPos.NEXT)
     p._f("I", 11)
     p.set_text_color(190, 215, 240)
-    p.cell(0, 7, "Phase 5 -- Prometheus, JWT, déploiement cloud -- à venir.",
+    p.cell(0, 7, "Phase 5 en cours -- Render + Supabase (etape 35) a venir.",
            align="C", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
     p.set_y(150)
