@@ -16,7 +16,7 @@ col1, col2 = st.columns(2)
 with col1:
     start_year = st.number_input("Année début", min_value=2000, max_value=2100, value=2010, step=1)
 with col2:
-    end_year = st.number_input("Année fin", min_value=2000, max_value=2100, value=2023, step=1)
+    end_year = st.number_input("Année fin", min_value=2000, max_value=2100, value=2024, step=1)
 
 sen_records = get_inflation("SEN", int(start_year), int(end_year))
 civ_records = get_inflation("CIV", int(start_year), int(end_year))
@@ -101,4 +101,12 @@ for year in all_years:
     rows.append(row)
 
 if rows:
-    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+    df_table = pd.DataFrame(rows)
+    st.dataframe(df_table, use_container_width=True, hide_index=True)
+
+    st.download_button(
+        label="⬇️ Exporter en CSV",
+        data=df_table.to_csv(index=False).encode("utf-8"),
+        file_name=f"inflation_{int(start_year)}_{int(end_year)}.csv",
+        mime="text/csv",
+    )

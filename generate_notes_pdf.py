@@ -117,7 +117,7 @@ class SahelPDF(FPDF):
             ("Phase 4", "Jenkins CI/CD",
              "Agents Docker, JCasC, pre-commit, Shared Library, Multibranch"),
             ("Phase 5", "Securite + Cloud",
-             "Prometheus RED, JWT OAuth2 (HS256), Render + Supabase (code + seed OK)"),
+             "Prometheus RED, JWT OAuth2 (HS256), Render + Supabase, GitHub Actions WB->Supabase"),
         ]
         for tag, title, desc in phases:
             y = self.get_y()
@@ -1421,6 +1421,85 @@ def build(p: SahelPDF):
         "sync: false : declare la variable dans le YAML sans exposer la valeur (secret)."
     )
 
+    # ── 5.4 GitHub Actions — données réelles en prod ─────────────────────────
+    p.section("5.4  Donnees reelles en prod (etape 36) : GitHub Actions -> World Bank -> Supabase")
+    p.label("Probleme resolu :")
+    p.body(
+        "Le pipeline local (Airflow -> TimescaleDB -> dbt -> sync) necessite 5 services "
+        "locaux. Impossible a deployer sur le cloud gratuit. Solution : court-circuiter "
+        "la stack entiere. Un script Python standalone appelle l'API World Bank (publique) "
+        "et ecrit directement dans les marts Supabase. GitHub Actions = infrastructure "
+        "cloud gratuite (2 000 min/mois sur repos publics), aucun service a maintenir."
+    )
+    p.code(
+        "# Architecture retenue\n"
+        "# AVANT (trop complexe)\n"
+        "# LOCAL: Airflow -> TimescaleDB -> dbt -> sync_to_supabase.py -> Supabase\n"
+        "\n"
+        "# APRES (cloud-native)\n"
+        "# GitHub Actions (cron mensuel) -> World Bank API -> ingest_worldbank.py -> Supabase"
+    )
+    p.label("Deux tables upsertees :")
+    p.bullets([
+        "mart__macro__indicators_annual : 5 indicateurs WB x SEN+CIV x 2000-2024. "
+        "yoy_change_pct calcule en Python (equivalent LAG SQL). ~250 lignes reelles.",
+        "mart__risk__score_monthly : risk score base inflation uniquement (sans WFP). "
+        "risk_score = 0.4 x LEAST(100, inflation_rate x 5). price_trend_score = 0.",
+        "mart__food__prices_monthly : non touche -> seed Supabase intact en attente cle WFP.",
+    ])
+    p.code(
+        "# .github/workflows/ingest_worldbank.yml\n"
+        "on:\n"
+        "  schedule:\n"
+        "    - cron: '0 6 1 * *'   # 1er du mois a 06h00 UTC\n"
+        "  workflow_dispatch:        # declenchement manuel depuis l'UI GitHub\n"
+        "\n"
+        "jobs:\n"
+        "  ingest:\n"
+        "    runs-on: ubuntu-latest\n"
+        "    timeout-minutes: 10\n"
+        "    steps:\n"
+        "      - uses: actions/checkout@v4\n"
+        "      - uses: actions/setup-python@v5\n"
+        "        with: { python-version: '3.11' }\n"
+        "      - run: pip install psycopg2-binary\n"
+        "      - name: Run World Bank ingestion\n"
+        "        env:\n"
+        "          DATABASE_URL_OVERRIDE: ${{ secrets.DATABASE_URL_OVERRIDE }}\n"
+        "        run: python infra/supabase/ingest_worldbank.py"
+    )
+    p.label("LAG SQL -> Python :")
+    p.code(
+        "# Equivalent de LAG() OVER (PARTITION BY country_code, indicator_code ORDER BY period)\n"
+        "groups = defaultdict(list)\n"
+        "for r in records:\n"
+        "    groups[(r['country_code'], r['indicator_code'])].append(r)\n"
+        "\n"
+        "for group in groups.values():\n"
+        "    group.sort(key=lambda x: x['period'])\n"
+        "    for i, r in enumerate(group):\n"
+        "        prev = group[i - 1]['indicator_value'] if i > 0 else None\n"
+        "        yoy = round((cur / prev - 1) * 100, 4) if cur and prev else None\n"
+        "        result.append({**r, 'yoy_change_pct': yoy})"
+    )
+    p.label("Acces public a l'application :")
+    p.body(
+        "Streamlit (vitrine) : pas d'authentification. N'importe qui avec l'URL peut "
+        "voir les donnees. FastAPI est protegee par JWT, mais Streamlit gere le token "
+        "en arriere-plan (_get_token() avec credentials des env vars Render). "
+        "Partager le lien Streamlit = partager les donnees. "
+        "Pour restreindre l'acces : st.text_input(type='password') + st.stop() "
+        "dans app.py, ou Streamlit Community Cloud private apps (gratuit)."
+    )
+    p.retenir(
+        "GitHub Actions remplace Airflow pour les sources publiques. "
+        "workflow_dispatch = bouton 'Run workflow' dans l'UI GitHub, indispensable pour tester. "
+        "Python recalcule les transformations dbt (LAG yoy, risk score) directement -- "
+        "dbt reste dans le repo comme documentation mais ne tourne pas en prod. "
+        "Secrets GitHub (${{ secrets.NOM }}) = meme principe que withCredentials Jenkins "
+        "ou sync:false Render -- valeur injectee a l'execution, masquee dans les logs."
+    )
+
     # ── Page finale ───────────────────────────────────────────────────────
     p.add_page()
     p.set_y(90)
@@ -1437,7 +1516,7 @@ def build(p: SahelPDF):
            new_x=XPos.LMARGIN, new_y=YPos.NEXT)
     p._f("I", 11)
     p.set_text_color(190, 215, 240)
-    p.cell(0, 7, "Phase 5 : Prometheus + JWT + Render + Supabase (etapes 33-35 terminees).",
+    p.cell(0, 7, "Phase 5 : Prometheus + JWT + Render + Supabase + GitHub Actions (etapes 33-36).",
            align="C", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
     p.set_y(150)

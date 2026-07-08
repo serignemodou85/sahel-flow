@@ -3,7 +3,7 @@ import streamlit as st
 
 from api_client import get_health, get_risk_scores
 
-st.set_page_config(page_title="Vue d'ensemble — Sahel Flow", layout="wide")
+st.set_page_config(page_title="Vue d'ensemble — Sahel Flow", page_icon="📊", layout="wide")
 
 _LEVEL_BADGE = {
     "low":      "🟢 FAIBLE",
@@ -12,26 +12,19 @@ _LEVEL_BADGE = {
     "critical": "🔴 CRITIQUE",
 }
 
-_LEVEL_LINE_COLOR = {
-    "low": "green",
-    "medium": "gold",
-    "high": "orange",
-    "critical": "red",
-}
-
 # ── Statut API ─────────────────────────────────────────────────────────────────
 health = get_health()
 api_ok = health.get("status") == "ok"
 db_ok  = health.get("db") == "ok"
 
 if api_ok and db_ok:
-    st.success("API opérationnelle  |  Base de données connectée")
+    st.success("API opérationnelle  |  Base de données connectée", icon="✅")
 elif api_ok:
-    st.warning("API opérationnelle  |  Base de données inaccessible")
+    st.warning("API opérationnelle  |  Base de données inaccessible", icon="⚠️")
 else:
-    st.error("API indisponible — données en cache affichées si disponibles")
+    st.error("API indisponible — données en cache affichées si disponibles", icon="🔴")
 
-st.title("Vue d'ensemble — État actuel")
+st.title("📊 Vue d'ensemble — État actuel")
 st.markdown("---")
 
 # ── Risk scores ────────────────────────────────────────────────────────────────
@@ -39,6 +32,66 @@ sen_records = get_risk_scores("SEN")
 civ_records = get_risk_scores("CIV")
 
 col1, col2 = st.columns(2)
+
+
+def _risk_gauge(score: float, delta_amount: float | None, title: str, level: str) -> go.Figure:
+    if score < 25:
+        bar_color = "#2ecc71"
+    elif score < 50:
+        bar_color = "#f1c40f"
+    elif score < 75:
+        bar_color = "#e67e22"
+    else:
+        bar_color = "#e74c3c"
+
+    mode = "gauge+number+delta" if delta_amount is not None else "gauge+number"
+
+    indicator_kwargs: dict = dict(
+        mode=mode,
+        value=score,
+        title={
+            "text": (
+                f"{title}<br>"
+                f"<span style='font-size:0.8em;color:gray'>"
+                f"{_LEVEL_BADGE.get(level, level.upper())}</span>"
+            ),
+            "font": {"size": 16},
+        },
+        gauge={
+            "axis": {"range": [0, 100], "tickwidth": 1, "tickcolor": "#555"},
+            "bar": {"color": bar_color, "thickness": 0.25},
+            "bgcolor": "white",
+            "borderwidth": 2,
+            "bordercolor": "#ddd",
+            "steps": [
+                {"range": [0, 25],   "color": "#d5f5e3"},
+                {"range": [25, 50],  "color": "#fef9e7"},
+                {"range": [50, 75],  "color": "#fdf2e9"},
+                {"range": [75, 100], "color": "#fdedec"},
+            ],
+            "threshold": {
+                "line": {"color": bar_color, "width": 4},
+                "thickness": 0.75,
+                "value": score,
+            },
+        },
+        number={"suffix": " / 100", "font": {"size": 34}},
+    )
+
+    if delta_amount is not None:
+        indicator_kwargs["delta"] = {
+            "reference": score - delta_amount,
+            "increasing": {"color": "#e74c3c"},   # hausse du risque = rouge
+            "decreasing": {"color": "#2ecc71"},
+        }
+
+    fig = go.Figure(go.Indicator(**indicator_kwargs))
+    fig.update_layout(
+        height=300,
+        margin=dict(l=30, r=30, t=70, b=10),
+        paper_bgcolor="rgba(0,0,0,0)",
+    )
+    return fig
 
 
 def _render_country(col, flag: str, name: str, records: list[dict]) -> None:
@@ -49,24 +102,35 @@ def _render_country(col, flag: str, name: str, records: list[dict]) -> None:
             st.info("Pas de données disponibles")
             return
 
-        current = records[0]   # ORDER BY period DESC → index 0 = plus récent
+        current = records[0]
         prev    = records[1] if len(records) > 1 else None
 
-        score = float(current["risk_score"])
-        delta = round(score - float(prev["risk_score"]), 2) if prev else None
-        level = current.get("risk_level", "low")
+        score       = float(current["risk_score"])
+        delta       = round(score - float(prev["risk_score"]), 2) if prev else None
+        level       = current.get("risk_level", "low")
+        period      = current.get("period", "—")
 
-        st.metric(
-            label=f"Risk Score — {current['period']}",
-            value=f"{score:.1f} / 100",
-            delta=f"{delta:+.1f} vs mois précédent" if delta is not None else None,
-            delta_color="inverse",   # hausse du risque = rouge
+        st.plotly_chart(
+            _risk_gauge(score, delta, f"{flag} {name} — {period}", level),
+            use_container_width=True,
         )
-        st.markdown(f"Niveau : **{_LEVEL_BADGE.get(level, level.upper())}**")
 
-        inner_c1, inner_c2 = st.columns(2)
-        inner_c1.metric("Tendance prix", f"{float(current['price_trend_score']):.1f}")
-        inner_c2.metric("Score inflation", f"{float(current['inflation_score']):.1f}")
+        sub_c1, sub_c2 = st.columns(2)
+        sub_c1.metric(
+            "Tendance prix",
+            f"{float(current['price_trend_score']):.1f}",
+            help="Composante WFP (prix alimentaires)",
+        )
+        sub_c2.metric(
+            "Score inflation",
+            f"{float(current['inflation_score']):.1f}",
+            help="Composante World Bank (FP.CPI.TOTL.ZG)",
+        )
+        if delta is not None:
+            st.caption(
+                f"Variation vs période précédente : "
+                f"**{'↑' if delta > 0 else '↓'} {abs(delta):.2f} pts**"
+            )
 
 
 _render_country(col1, "🇸🇳", "Sénégal (SEN)", sen_records)
@@ -98,7 +162,11 @@ if chart_records:
             marker=dict(size=6),
         ))
 
-    for y_val, color, label in [(25, "gold", "MOYEN"), (50, "orange", "ÉLEVÉ"), (75, "red", "CRITIQUE")]:
+    for y_val, color, label in [
+        (25, "gold",   "MOYEN"),
+        (50, "orange", "ÉLEVÉ"),
+        (75, "red",    "CRITIQUE"),
+    ]:
         fig.add_hline(
             y=y_val, line_dash="dash", line_color=color, line_width=1,
             annotation_text=label, annotation_position="right",
@@ -110,6 +178,8 @@ if chart_records:
         height=350,
         margin=dict(l=0, r=80, t=20, b=0),
         legend=dict(orientation="h", yanchor="bottom", y=1.02),
+        plot_bgcolor="rgba(0,0,0,0)",
+        paper_bgcolor="rgba(0,0,0,0)",
     )
     st.plotly_chart(fig, use_container_width=True)
 else:

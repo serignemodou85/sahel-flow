@@ -76,7 +76,7 @@ with src_col1:
         - **Granularité** : annuelle
         - **Pays** : SEN, CIV
         - **Endpoint** : `https://api.worldbank.org/v2/country/{code}/indicator/{ind}`
-        - **Ingestion** : DAG Airflow mensuel (données stables, fréquence > nécessaire)
+        - **Ingestion** : GitHub Actions — cron `0 6 1 * *` (1er du mois, cloud natif)
         """
     )
 
@@ -88,7 +88,7 @@ with src_col2:
         - **Granularité** : mensuelle
         - **Pays** : SEN, CIV
         - **Endpoint** : `https://api.vam.wfp.org/...`
-        - **Ingestion** : DAG Airflow mensuel
+        - **Ingestion** : seed manuel (données test — WFP VAM prévu)
         - **Note** : couverture des marchés variable selon les mois
         """
     )
@@ -100,39 +100,52 @@ st.header("Stack technique — bout en bout")
 
 st.code(
     """
-WB API                WFP VAM API
-   │                      │
-   └──────────┬───────────┘
-              │
-         Airflow DAG
-     (ingestion mensuelle)
-              │
-              ▼
-       TimescaleDB
-        schéma raw
-   (ht_worldbank_indicators,
-    ht_wfp_food_prices)
-              │
-              ▼
-            dbt
-     raw → core → marts
-   (mart__food__prices_monthly,
-    mart__macro__indicators_annual,
-    mart__risk__score_monthly)
-              │
-         ┌───┴────────────────┐
-         │                    │
-      FastAPI              Grafana
-   /v1/risk-score      (dashboards JSON,
-   /v1/food-prices      provisioning auto)
-   /v1/inflation
-   /v1/compare
-         │
-         ▼
-      Streamlit
-  (cette application)
+WB API (annuel)              WFP VAM API (mensuel)
+       │                            │
+       ▼                            ▼
+GitHub Actions               Seed / futur DAG
+ingest_worldbank.py         (données test WFP)
+  (cron 1er/mois)                   │
+       │                            │
+       └──────────┬─────────────────┘
+                  │
+              Supabase
+           schéma « marts »
+    (mart__macro__indicators_annual,
+     mart__food__prices_monthly,
+     mart__risk__score_monthly)
+                  │
+              FastAPI
+         /v1/risk-score
+         /v1/food-prices
+         /v1/inflation
+         /v1/compare
+                  │
+            ┌─────┴──────────┐
+            │                │
+        Streamlit          Grafana
+   (cette application)   (dashboards RED)
 """,
     language="text",
+)
+
+st.markdown("---")
+
+# ── Roadmap ────────────────────────────────────────────────────────────────────
+st.header("Roadmap — Prochaines évolutions")
+
+st.markdown(
+    """
+    | Fonctionnalité | Statut | Description |
+    |---|---|---|
+    | Carte satellite interactive | ✅ Disponible | Fond Esri WorldImagery + score de risque géolocalisé |
+    | GitHub Actions pipeline | ✅ En prod | Ingestion World Bank mensuelle, cloud natif |
+    | WFP VAM intégration live | 🔜 Prévu | Prix alimentaires en temps réel (actuellement : données test) |
+    | Extension UEMOA | 🔜 Prévu | Mali, Burkina, Niger, Togo, Bénin, Guinée-Bissau |
+    | Imagerie satellite NDVI | 🔮 Futur | Indices de végétation (Sentinel-2 via Copernicus) |
+    | Alertes email/SMS | 🔮 Futur | Notification automatique quand score > seuil critique |
+    | API publique documentée | 🔮 Futur | Swagger/OpenAPI pour partenaires institutionnels |
+    """
 )
 
 st.markdown("---")
