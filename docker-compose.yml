@@ -206,7 +206,28 @@ services:
     networks:
       - sahel_net
 
-  # ── 8. Grafana ────────────────────────────────────────────────────────────────
+  # ── 8. Prometheus ────────────────────────────────────────────────────────────
+  # Collecte les métriques de l'API FastAPI toutes les 15s via /metrics.
+  # UI : http://localhost:9090
+  prometheus:
+    image: prom/prometheus:v2.52.0
+    container_name: sahel_prometheus
+    depends_on:
+      - api
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=15d'
+      - '--web.enable-lifecycle'
+    networks:
+      - sahel_net
+
+  # ── 9. Grafana ────────────────────────────────────────────────────────────────
   # Dashboards de monitoring : prix alimentaires, inflation, risk score.
   # Provisioning automatique via fichiers montés — aucun clic, tout est versionné.
   # UI : http://localhost:3000  (login admin / valeur de GRAFANA_PASSWORD)
@@ -239,6 +260,7 @@ volumes:
   airflow_logs:       # logs des tâches Airflow
   grafana_data:       # dashboards, alertes et préférences Grafana
   jenkins_data:       # config, jobs et workspace Jenkins
+  prometheus_data:    # séries temporelles Prometheus (15 jours de rétention)
 
 # ── Réseau interne ─────────────────────────────────────────────────────────────
 # Les containers se parlent par nom de service (ex: host "timescaledb" pour PostgreSQL).

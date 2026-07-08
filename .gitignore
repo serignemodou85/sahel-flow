@@ -20,6 +20,7 @@ build/
 *.egg-info/
 .venv/
 venv/
+.claude/
 
 # ── dbt ──────────────────────────────────────────────────────────────────────
 dbt/target/
@@ -47,3 +48,5 @@ Thumbs.db
 
 # ── Documentation personnelle ─────────────────────────────────────────────────
 docs/
+sahel-flow-notes.pdf
+generate_notes_pdf.py

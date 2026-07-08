@@ -3,6 +3,6 @@
 
 httpx==0.27.0           # client HTTP pour World Bank + WFP VAM
 psycopg2-binary==2.9.9  # driver PostgreSQL pour le loader TimescaleDB
-dbt-postgres==1.8.4     # dbt avec adaptateur PostgreSQL/TimescaleDB
+dbt-postgres==1.8.2     # dbt avec adaptateur PostgreSQL/TimescaleDB (1.8.4 inexistant sur PyPI)
 tenacity==8.3.0         # retry déclaratif (5xx + timeouts, jamais 4xx)
 pytest==8.2.2           # tests unitaires et d'intégration

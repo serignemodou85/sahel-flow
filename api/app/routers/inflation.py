@@ -2,11 +2,12 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, Query
 
+from app.auth.service import get_current_user
 from app.db.deps import get_conn
 from app.schemas.inflation import InflationRecord
 from app.services import inflation_service
 
-router = APIRouter(tags=["inflation"])
+router = APIRouter(tags=["inflation"], dependencies=[Depends(get_current_user)])
 
 
 @router.get("/inflation", response_model=list[InflationRecord])

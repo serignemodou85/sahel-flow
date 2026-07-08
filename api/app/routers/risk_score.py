@@ -3,11 +3,12 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, Query
 
+from app.auth.service import get_current_user
 from app.db.deps import get_conn
 from app.schemas.risk_score import RiskScoreRecord
 from app.services import risk_score_service
 
-router = APIRouter(tags=["risk-score"])
+router = APIRouter(tags=["risk-score"], dependencies=[Depends(get_current_user)])
 
 
 @router.get("/risk-score", response_model=list[RiskScoreRecord])

@@ -2,12 +2,13 @@ from datetime import date
 
 from fastapi import APIRouter, Depends, Query
 
+from app.auth.service import get_current_user
 from app.db.deps import get_conn
 from app.schemas.compare import CompareResponse
 from app.services import risk_score_service
 from shared.constants import UEMOA_COUNTRIES
 
-router = APIRouter(tags=["compare"])
+router = APIRouter(tags=["compare"], dependencies=[Depends(get_current_user)])
 
 
 @router.get("/compare", response_model=CompareResponse)

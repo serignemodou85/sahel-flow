@@ -23,6 +23,12 @@ class Settings(BaseSettings):
     # Inscription : https://api.wfpvam.org (voir .env.example)
     wfp_api_key: str = ""
 
+    # ── Auth ─────────────────────────────────────────────────────────────────
+    # Valeurs dev faibles — OBLIGATOIRE de les surcharger en production via .env
+    jwt_secret_key: str = "dev_secret_change_in_production"
+    api_username:   str = "admin"
+    api_password:   str = "change_me_in_production"
+
     # ── App ───────────────────────────────────────────────────────────────────
     app_env:   str = "development"
     log_level: str = "INFO"

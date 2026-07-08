@@ -11,6 +11,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
+from app.auth.service import get_current_user
 from app.db.deps import get_conn
 from app.main import app
 
@@ -49,6 +50,7 @@ def client(mock_conn):
         yield mock_conn
 
     app.dependency_overrides[get_conn] = override_get_conn
+    app.dependency_overrides[get_current_user] = lambda: "test-user"
 
     with patch("app.main.init_pool"), patch("app.main.close_pool"):
         with TestClient(app) as c:

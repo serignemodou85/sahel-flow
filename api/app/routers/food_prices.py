@@ -3,11 +3,12 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, Query
 
+from app.auth.service import get_current_user
 from app.db.deps import get_conn
 from app.schemas.food_prices import FoodPriceRecord
 from app.services import food_prices_service
 
-router = APIRouter(tags=["food-prices"])
+router = APIRouter(tags=["food-prices"], dependencies=[Depends(get_current_user)])
 
 
 @router.get("/food-prices", response_model=list[FoodPriceRecord])
