@@ -117,7 +117,7 @@ class SahelPDF(FPDF):
             ("Phase 4", "Jenkins CI/CD",
              "Agents Docker, JCasC, pre-commit, Shared Library, Multibranch"),
             ("Phase 5", "Securite + Cloud",
-             "Prometheus RED, JWT OAuth2 (HS256), Render + Supabase (en cours)"),
+             "Prometheus RED, JWT OAuth2 (HS256), Render + Supabase (code + seed OK)"),
         ]
         for tag, title, desc in phases:
             y = self.get_y()
@@ -1356,6 +1356,71 @@ def build(p: SahelPDF):
         "utilisateur dans 'sub', pas dans un champ custom."
     )
 
+    p.sep()
+
+    # ── 5.3 Render + Supabase ─────────────────────────────────────────────────
+    p.section("5.3  Deploiement cloud (etape 35) : Render + Supabase")
+    p.label("Supabase vs TimescaleDB :")
+    p.body(
+        "Supabase = PostgreSQL standard sans extension TimescaleDB. "
+        "Les marts (marts.*) utilisent du SQL pur -- DATE, NUMERIC, PRIMARY KEY. "
+        "L'API ne lit que les marts : les requetes SQL fonctionnent identiquement "
+        "sur TimescaleDB local et PostgreSQL Supabase cloud. Zero modification du code metier."
+    )
+    p.label("DATABASE_URL_OVERRIDE -- adaptateur de configuration :")
+    p.code(
+        "# shared/config.py\n"
+        "database_url_override: str | None = None\n"
+        "\n"
+        "@property\n"
+        "def database_url(self) -> str:\n"
+        "    if self.database_url_override:\n"
+        "        return self.database_url_override   # prod Supabase\n"
+        "    return f'postgresql+psycopg2://{self.postgres_user}:...'\n"
+        "\n"
+        "# api/app/db/pool.py\n"
+        "if s.database_url_override:\n"
+        "    _pool = pg_pool.ThreadedConnectionPool(1, 5, dsn=s.database_url_override)\n"
+        "else:\n"
+        "    _pool = pg_pool.ThreadedConnectionPool(minconn=1, maxconn=5,\n"
+        "        host=s.postgres_host, port=s.postgres_port, ...)"
+    )
+    p.label("PORT dynamique + render.yaml IaC :")
+    p.code(
+        "# Dockerfile -- PORT injectable par Render\n"
+        "CMD [\"sh\", \"-c\", \"uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}\"]\n"
+        "# sh -c obligatoire : ${VAR} n'existe pas en forme exec JSON\n"
+        "\n"
+        "# render.yaml\n"
+        "services:\n"
+        "  - name: sahel-api\n"
+        "    envVars:\n"
+        "      - key: DATABASE_URL_OVERRIDE\n"
+        "        sync: false    # valeur dans le dashboard Render, pas en git\n"
+        "\n"
+        "  - name: sahel-streamlit\n"
+        "    envVars:\n"
+        "      - key: API_BASE_URL\n"
+        "        fromService:\n"
+        "          property: url   # url = https://... (pas host = hostname seul)"
+    )
+    p.label("seed.py -- donnees de demonstration idempotentes :")
+    p.code(
+        "random.seed(42)   # reproductible : meme output a chaque run\n"
+        "# 192 prix | 6 inflation | 48 risk scores = 246 lignes\n"
+        "\n"
+        "INSERT INTO marts.mart__food__prices_monthly (...) VALUES %s\n"
+        "ON CONFLICT (period, country_code, commodity) DO UPDATE SET ...\n"
+        "# ON CONFLICT + seed deterministique = idempotence totale"
+    )
+    p.retenir(
+        "DATABASE_URL_OVERRIDE : meme code en local (5 vars) et en prod (1 DSN). "
+        "L'adaptateur est dans la couche config, pas dans le code metier. "
+        "property: url (pas host) dans fromService : url = URL complete avec https://. "
+        "sh -c pour $PORT : la substitution de variable shell n'existe pas en forme exec JSON. "
+        "sync: false : declare la variable dans le YAML sans exposer la valeur (secret)."
+    )
+
     # ── Page finale ───────────────────────────────────────────────────────
     p.add_page()
     p.set_y(90)
@@ -1372,7 +1437,7 @@ def build(p: SahelPDF):
            new_x=XPos.LMARGIN, new_y=YPos.NEXT)
     p._f("I", 11)
     p.set_text_color(190, 215, 240)
-    p.cell(0, 7, "Phase 5 en cours -- Render + Supabase (etape 35) a venir.",
+    p.cell(0, 7, "Phase 5 : Prometheus + JWT + Render + Supabase (etapes 33-35 terminees).",
            align="C", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
     p.set_y(150)
