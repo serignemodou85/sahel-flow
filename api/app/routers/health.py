@@ -24,13 +24,16 @@ def health() -> HealthResponse:
     db_status = "ok"
     try:
         s = get_settings()
-        conn = psycopg2.connect(
-            host=s.postgres_host,
-            port=s.postgres_port,
-            dbname=s.postgres_db,
-            user=s.postgres_user,
-            password=s.postgres_password,
-        )
+        if s.database_url_override:
+            conn = psycopg2.connect(dsn=s.database_url_override)
+        else:
+            conn = psycopg2.connect(
+                host=s.postgres_host,
+                port=s.postgres_port,
+                dbname=s.postgres_db,
+                user=s.postgres_user,
+                password=s.postgres_password,
+            )
         with conn.cursor() as cur:
             cur.execute("SELECT 1")
         conn.close()
