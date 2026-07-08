@@ -25,4 +25,8 @@ services:
     plan: free
     envVars:
       - key: API_BASE_URL
-        sync: false          # saisir manuellement : https://sahel-api.onrender.com
+        sync: false          # saisir manuellement : https://sahel-api-h3gg.onrender.com
+      - key: API_USERNAME
+        sync: false
+      - key: API_PASSWORD
+        sync: false

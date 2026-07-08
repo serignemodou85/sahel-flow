@@ -12,6 +12,29 @@ _BASE = os.environ.get("API_BASE_URL", "http://localhost:8000")
 _HTTP_ERRORS = (httpx.RequestError, httpx.HTTPStatusError, ValueError)
 
 
+@st.cache_data(ttl=1700)
+def _get_token() -> str:
+    """Récupère un JWT depuis l'API. Cache 28 min (< 30 min d'expiration du token)."""
+    try:
+        r = httpx.post(
+            f"{_BASE}/v1/auth/token",
+            data={
+                "username": os.environ.get("API_USERNAME", ""),
+                "password": os.environ.get("API_PASSWORD", ""),
+            },
+            timeout=10,
+        )
+        r.raise_for_status()
+        return r.json().get("access_token", "")
+    except _HTTP_ERRORS:
+        return ""
+
+
+def _auth_headers() -> dict:
+    token = _get_token()
+    return {"Authorization": f"Bearer {token}"} if token else {}
+
+
 @st.cache_data(ttl=300)
 def get_health() -> dict:
     try:
@@ -44,7 +67,7 @@ def get_food_prices(
             params["start_date"] = start_date
         if end_date:
             params["end_date"] = end_date
-        r = httpx.get(f"{_BASE}/v1/food-prices", params=params, timeout=10)
+        r = httpx.get(f"{_BASE}/v1/food-prices", params=params, headers=_auth_headers(), timeout=10)
         r.raise_for_status()
         return r.json()
     except _HTTP_ERRORS:
@@ -63,7 +86,7 @@ def get_inflation(
             params["start_year"] = start_year
         if end_year is not None:
             params["end_year"] = end_year
-        r = httpx.get(f"{_BASE}/v1/inflation", params=params, timeout=10)
+        r = httpx.get(f"{_BASE}/v1/inflation", params=params, headers=_auth_headers(), timeout=10)
         r.raise_for_status()
         return r.json()
     except _HTTP_ERRORS:
@@ -82,7 +105,7 @@ def get_risk_scores(
             params["start_date"] = start_date
         if end_date:
             params["end_date"] = end_date
-        r = httpx.get(f"{_BASE}/v1/risk-score", params=params, timeout=10)
+        r = httpx.get(f"{_BASE}/v1/risk-score", params=params, headers=_auth_headers(), timeout=10)
         r.raise_for_status()
         return r.json()
     except _HTTP_ERRORS:
@@ -101,7 +124,7 @@ def get_compare(
             params["start_date"] = start_date
         if end_date:
             params["end_date"] = end_date
-        r = httpx.get(f"{_BASE}/v1/compare", params=params, timeout=10)
+        r = httpx.get(f"{_BASE}/v1/compare", params=params, headers=_auth_headers(), timeout=10)
         r.raise_for_status()
         return r.json().get("countries", {"SEN": [], "CIV": []})
     except _HTTP_ERRORS:
