@@ -25,7 +25,4 @@ services:
     plan: free
     envVars:
       - key: API_BASE_URL
-        fromService:
-          name: sahel-api
-          type: web
-          property: url      # url = https://sahel-api.onrender.com (avec schéma)
+        sync: false          # saisir manuellement : https://sahel-api.onrender.com
