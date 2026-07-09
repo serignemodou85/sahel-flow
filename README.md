@@ -9,20 +9,20 @@ Pipeline de données de bout en bout : ingestion → transformation → API REST
 ## Ce qui tourne en production (cloud)
 
 ```
-World Bank API (annuel)          WFP VAM (données test WFP)
+World Bank API (annuel)          HDX WFP (mensuel, public, sans clé)
         │                               │
         ▼                               ▼
- GitHub Actions                    Seed Supabase
-ingest_worldbank.py               (infra/supabase/seed.py)
-  cron "0 6 1 * *"                       │
+ GitHub Actions                  GitHub Actions
+ingest_worldbank.py              ingest_wfp.py
+  cron "0 6 1 * *"               cron "0 7 1 * *"
         │                               │
         └──────────────┬────────────────┘
                        │
                    Supabase
                schéma « marts »
       mart__macro__indicators_annual   ← 250 lignes réelles WB 2000–2024
-       mart__food__prices_monthly      ← données test (WFP live = futur)
-        mart__risk__score_monthly      ← 94 scores calculés (inflation-only)
+       mart__food__prices_monthly      ← prix HDX réels >= 2020 (SEN + CIV)
+        mart__risk__score_monthly      ← score complet 0.6×price_trend + 0.4×inflation
                        │
                    FastAPI
                 (Render — free)
@@ -47,8 +47,8 @@ ingest_worldbank.py               (infra/supabase/seed.py)
 | Couche | **Production** | Dev local | Rôle |
 |---|---|---|---|
 | Stockage | **Supabase** (PostgreSQL managé) | TimescaleDB | Data warehouse — marts uniquement |
-| Ingestion | **GitHub Actions** (2 workflows) | Apache Airflow LocalExecutor | Ingestion mensuelle WB + keep-alive |
-| Transformation | **Python** (ingest_worldbank.py) | dbt (raw → core → marts) | Calcul YoY, risk score |
+| Ingestion | **GitHub Actions** (3 workflows) | Apache Airflow LocalExecutor | Ingestion mensuelle WB + WFP + keep-alive |
+| Transformation | **Python** (ingest_worldbank.py + ingest_wfp.py) | dbt (raw → core → marts) | Calcul YoY, price_trend, risk score |
 | API | **FastAPI** (Render free) | FastAPI (Docker) | Endpoints REST — JWT HS256 |
 | Vitrine | **Streamlit** (Render free) | Streamlit (Docker) | 6 pages analytics |
 | CI/CD | — | Jenkins LTS (Docker) | Lint + 33 tests + Docker build |
@@ -60,8 +60,8 @@ ingest_worldbank.py               (infra/supabase/seed.py)
 
 | Source | Indicateurs | Granularité | Pays | Méthode |
 |---|---|---|---|---|
-| **World Bank API** | FP.CPI.TOTL.ZG · NY.GDP.PCAP.CD · SN.ITK.DEFC.ZS · AG.PRD.FOOD.XD · SP.POP.TOTL | Annuelle | SEN · CIV | GitHub Actions cron 1er/mois |
-| **WFP VAM** | Prix alimentaires par marché et commodité | Mensuelle | SEN · CIV | Seed (données test) — live = futur |
+| **World Bank API** | FP.CPI.TOTL.ZG · NY.GDP.PCAP.CD · SN.ITK.DEFC.ZS · AG.PRD.FOOD.XD · SP.POP.TOTL | Annuelle | SEN · CIV | GitHub Actions — `ingest_worldbank.py` cron 1er/mois 06h00 UTC |
+| **HDX WFP** (Humanitarian Data Exchange) | Prix alimentaires par marché et commodité | Mensuelle | SEN · CIV | GitHub Actions — `ingest_wfp.py` cron 1er/mois 07h00 UTC |
 
 ---
 
@@ -100,15 +100,18 @@ inflation_score   : inflation_rate × 5  → borné [0, 100]
 
 ---
 
-## GitHub Actions — 2 workflows
+## GitHub Actions — 3 workflows
 
 | Workflow | Déclenchement | Rôle |
 |---|---|---|
-| `ingest_worldbank.yml` | Cron `0 6 1 * *` + `workflow_dispatch` | Ingestion World Bank → Supabase (250 lignes réelles) |
+| `ingest_worldbank.yml` | Cron `0 6 1 * *` + `workflow_dispatch` | Ingestion World Bank → Supabase (250 lignes réelles, 5 indicateurs) |
+| `ingest_wfp.yml` | Cron `0 7 1 * *` + `workflow_dispatch` | Ingestion WFP HDX → Supabase (prix >= 2020 + risk score complet) |
 | `keep_alive.yml` | Cron `*/14 * * * *` + `workflow_dispatch` | Ping `/v1/health` — empêche Render free tier de s'endormir |
 
+**Ordre d'exécution le 1er du mois :** WB à 06h00 → WFP à 07h00 (inflation déjà en base pour le calcul du risk score complet)
+
 **Secrets requis :**
-- `DATABASE_URL_OVERRIDE` : DSN Supabase (pour ingest_worldbank.yml)
+- `DATABASE_URL_OVERRIDE` : DSN Supabase (pour ingest_worldbank.yml + ingest_wfp.yml)
 - `API_BASE_URL` : URL Render de l'API (pour keep_alive.yml)
 
 ---
@@ -196,8 +199,9 @@ sahel-flow/
 ├── infra/
 │   ├── timescaledb/init.sql   # Schémas + hypertables (local)
 │   ├── supabase/
-│   │   ├── seed.py            # Données de démonstration (192 prix + 48 scores)
-│   │   └── ingest_worldbank.py # Script standalone WB → Supabase (prod)
+│   │   ├── seed.py              # Données de démonstration (192 prix + 48 scores)
+│   │   ├── ingest_worldbank.py  # Script standalone WB → Supabase (prod)
+│   │   └── ingest_wfp.py        # Script standalone WFP HDX → Supabase (prod)
 │   └── airflow/Dockerfile     # Image Airflow custom (local)
 ├── render.yaml                # IaC Render — 2 services (api + streamlit)
 ├── docker-compose.yml         # 7 services locaux orchestrés
@@ -233,5 +237,5 @@ sahel-flow/
   - [x] Étape 35 — Déploiement Render + Supabase (seed 246 lignes)
   - [x] Étape 36 — Données réelles en prod (GitHub Actions → World Bank → 250 lignes)
   - [x] Étape 37 — UI commerciale Streamlit (gauges, carte satellite, monitoring strip, keep-alive)
-- [ ] Étape 38 — Ingestion WFP live (clé API requise) + risk score complet (0.6 × price_trend + 0.4 × inflation)
+  - [x] Étape 38 — Ingestion WFP HDX live (prix réels >= 2020 + risk score complet 0.6×price_trend + 0.4×inflation)
 - [ ] Extension UEMOA 8 pays (Mali, Burkina, Niger, Togo, Bénin, Guinée-Bissau)

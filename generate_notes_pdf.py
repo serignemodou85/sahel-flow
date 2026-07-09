@@ -1618,6 +1618,68 @@ def build(p: SahelPDF):
         "evite les re-rendus inutiles quand l'utilisateur interagit avec la carte)."
     )
 
+    # ── 5.6 Ingestion WFP HDX (etape 38) ────────────────────────────────────
+    p.section("5.6  Ingestion WFP HDX -- prix alimentaires reels (etape 38)")
+    p.label("Contexte : WFP VAM API 403 -> pivot vers HDX")
+    p.body(
+        "api.vam.wfp.org retourne 403 Forbidden sans cle API (delai d'obtention : semaines). "
+        "HDX (data.humdata.org) = plateforme officielle WFP pour les donnees humanitaires. "
+        "Memes donnees, format CSV standardise, zero authentification. "
+        "Pivotement vers HDX pour ne pas bloquer la production."
+    )
+    p.label("Architecture du script ingest_wfp.py :")
+    p.code(
+        "HDX CKAN API  ->  _hdx_csv_url(slug)  ->  URL CSV dynamique\n"
+        "      |\n"
+        "_fetch_rows()    : filtre >= 2020, dual column names (cm_name/cmName)\n"
+        "      |\n"
+        "_aggregate()     : AVG(price_local) par (period, country_code, commodity)\n"
+        "      |           WFP prix par marche -> mart attend prix par commodite\n"
+        "_compute_price_trend() : baseline_3m glissant -> price_trend_score [0-100]\n"
+        "      |\n"
+        "      +-> upsert mart__food__prices_monthly\n"
+        "_fetch_inflation() : lit inflation WB deja en base (ingeree a 06h00)\n"
+        "_compute_full_risk_scores() : 0.6 * price_trend + 0.4 * inflation_score\n"
+        "      +-> upsert mart__risk__score_monthly"
+    )
+    p.label("Decisions techniques cles :")
+    p.body(
+        "_FILTER_YEAR = 2020 : HDX donne 20+ ans d'historique. "
+        "Filtrage cote client (parsing) reduit le volume d'upsert de 20x. "
+        "utf-8-sig : gere le BOM optionnel en tete de CSV (Excel). "
+        "avg_price_usd = None : ratio price/baseline est currency-agnostique, "
+        "pas besoin de conversion XOF->USD. "
+        "URL CSV dynamique (CKAN package_show) : plus robuste qu'une URL hardcodee "
+        "car les resource_id HDX peuvent changer."
+    )
+    p.code(
+        "# Fenetre glissante Python -- equivalent SQL ROWS BETWEEN 3 PRECEDING AND 1 PRECEDING\n"
+        "for i, r in enumerate(group):  # group trie par period\n"
+        "    prev = [g['avg_price_local'] for g in group[max(0, i-3):i]]\n"
+        "    baseline_3m = sum(prev) / len(prev) if prev else None\n"
+        "    variation   = (float(cur) / float(baseline_3m) - 1) * 500\n"
+        "    price_trend = min(100.0, max(0.0, variation))\n"
+        "\n"
+        "# group[max(0, i-3):i] : max(0,...) evite les index negatifs\n"
+        "# i exclu : le mois courant ne fait pas partie de sa propre baseline"
+    )
+    p.label("Ordre d'execution -- dependance temporelle :")
+    p.code(
+        "01/mois 06h00 UTC -> ingest_worldbank.yml -> inflation en base\n"
+        "01/mois 07h00 UTC -> ingest_wfp.yml       -> lit inflation, calcule risk score complet\n"
+        "\n"
+        "# Sans le delai d'1h : la jointure inflation retourne NULL pour l'annee courante\n"
+        "# risk_score avant : 0.4 * inflation_score  (price_trend = 0, donnees seed)\n"
+        "# risk_score apres  : 0.6 * price_trend + 0.4 * inflation_score  (complet)"
+    )
+    p.retenir(
+        "HDX CKAN API : package_show?id=slug -> resources[*].url -> CSV sans cle. "
+        "utf-8-sig : superset d'utf-8 qui gere aussi le BOM -- toujours l'utiliser pour CSV externe. "
+        "Dual column names : row.get('cm_name') or row.get('cmName') -- cout nul, robustesse max. "
+        "_FILTER_YEAR : filtrer pendant le parsing (avant upsert) pas apres -- 20x moins de volume. "
+        "Dependance temporelle entre workflows : 1h de marge = solution simple sans Airflow TriggerDag."
+    )
+
     # ── Page finale ───────────────────────────────────────────────────────
     p.add_page()
     p.set_y(90)
@@ -1634,7 +1696,7 @@ def build(p: SahelPDF):
            new_x=XPos.LMARGIN, new_y=YPos.NEXT)
     p._f("I", 11)
     p.set_text_color(190, 215, 240)
-    p.cell(0, 7, "Phase 5 : Prometheus + JWT + Render + Supabase + GitHub Actions + UI commerciale (etapes 33-37).",
+    p.cell(0, 7, "Phase 5 : Prometheus + JWT + Render + Supabase + GitHub Actions + UI + WFP HDX (etapes 33-38).",
            align="C", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
     p.set_y(150)
