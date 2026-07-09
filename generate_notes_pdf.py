@@ -1500,6 +1500,124 @@ def build(p: SahelPDF):
         "ou sync:false Render -- valeur injectee a l'execution, masquee dans les logs."
     )
 
+    p.sep()
+
+    # ── 5.5 UI commerciale + keep-alive ──────────────────────────────────────
+    p.section("5.5  UI commerciale + keep-alive (etape 37)")
+    p.label("Probleme : Render free tier s'endort")
+    p.body(
+        "Render endort les services apres 15 min d'inactivite. "
+        "Le get_health() avait un timeout de 5s. Render prend 30-50s a se reveiller. "
+        "Resultat : 'API indisponible' a chaque ouverture de l'app, redeploi manuel requis. "
+        "Mauvaise solution : augmenter le timeout a 30s -> UI Streamlit gelee 30s. "
+        "Solution retenue : GitHub Actions keep-alive, ping /v1/health toutes les 14 min."
+    )
+    p.code(
+        "# .github/workflows/keep_alive.yml\n"
+        "on:\n"
+        "  schedule:\n"
+        "    - cron: '*/14 * * * *'   # toutes les 14 min (Render endort a 15 min)\n"
+        "  workflow_dispatch:            # test manuel depuis l'UI GitHub\n"
+        "\n"
+        "jobs:\n"
+        "  ping:\n"
+        "    runs-on: ubuntu-latest\n"
+        "    timeout-minutes: 2\n"
+        "    steps:\n"
+        "      - run: curl -sf ${{ secrets.API_BASE_URL }}/v1/health"
+    )
+    p.label("Landing page commerciale (app.py rewrite) :")
+    p.body(
+        "L'ancienne app.py etait une simple table de navigation. "
+        "La nouvelle est une vitrine ONGs/gouvernements/bailleurs : hero gradient bleu marine, "
+        "2 jauges Plotly go.Indicator live (SEN + CIV), 6 cartes de navigation, strip KPI. "
+        "go.Indicator (gauge coloree) remplace st.metric (chiffre nu) -- "
+        "la couleur communique le niveau de risque immediatement, sans lire le chiffre."
+    )
+    p.code(
+        "# go.Indicator -- jauge coloree avec zones\n"
+        "fig = go.Figure(go.Indicator(\n"
+        "    mode='gauge+number',\n"
+        "    value=score,\n"
+        "    gauge={\n"
+        "        'axis': {'range': [0, 100]},\n"
+        "        'bar': {'color': bar_color},    # vert/jaune/orange/rouge\n"
+        "        'steps': [\n"
+        "            {'range': [0,  25],  'color': '#d5f5e3'},   # faible\n"
+        "            {'range': [25, 50],  'color': '#fef9e7'},   # moyen\n"
+        "            {'range': [50, 75],  'color': '#fdf2e9'},   # eleve\n"
+        "            {'range': [75, 100], 'color': '#fdedec'},   # critique\n"
+        "        ],\n"
+        "    },\n"
+        "    number={'suffix': ' / 100'},\n"
+        "))"
+    )
+    p.label("Monitoring strip -- statut systeme en temps reel (01_overview.py) :")
+    p.body(
+        "3 metriques systeme ajoutees sous le titre de la page Vue d'ensemble : "
+        "statut API (GET /v1/health), derniere ingestion WB (period du record[0]), "
+        "prochain run pipeline (calcule depuis le cron '0 6 1 * *')."
+    )
+    p.code(
+        "from datetime import datetime, timezone\n"
+        "\n"
+        "# Prochain run : 1er du mois suivant a 06h00 UTC\n"
+        "now = datetime.now(timezone.utc)\n"
+        "if now.month == 12:\n"
+        "    next_run = datetime(now.year + 1, 1, 1, 6, 0, tzinfo=timezone.utc)\n"
+        "else:\n"
+        "    next_run = datetime(now.year, now.month + 1, 1, 6, 0, tzinfo=timezone.utc)\n"
+        "\n"
+        "days_until = (next_run.date() - now.date()).days\n"
+        "last_wb   = sen_records[0]['period'] if sen_records else '--'\n"
+        "\n"
+        "m1.metric('Statut systeme', '--- OK' if (api_ok and db_ok) else '--- Hors ligne')\n"
+        "m2.metric('Derniere ingestion WB', last_wb)\n"
+        "m3.metric('Prochain run pipeline', f'J-{days_until}',\n"
+        "          delta=next_run.strftime('%d/%m/%Y 06h00 UTC'), delta_color='off')"
+    )
+    p.label("Carte satellite Folium (06_carte.py) :")
+    p.body(
+        "Nouvelle page -- carte interactive avec fond satellite Esri WorldImagery (gratuit, "
+        "sans cle API). Cercles de risque colores par niveau + 12 marches alimentaires."
+    )
+    p.code(
+        "# Fond satellite Esri (gratuit, sans cle API)\n"
+        "m = folium.Map(\n"
+        "    tiles='https://server.arcgisonline.com/ArcGIS/rest/services'\n"
+        "          '/World_Imagery/MapServer/tile/{z}/{y}/{x}',\n"
+        "    attr='Esri WorldImagery',\n"
+        ")\n"
+        "\n"
+        "# Labels CartoDB superposes (noms villes, pays)\n"
+        "folium.TileLayer(\n"
+        "    tiles='https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png',\n"
+        "    overlay=True,   # superpose, ne remplace pas Esri\n"
+        "    control=True,\n"
+        ").add_to(m)\n"
+        "\n"
+        "# Cercle de risque -- taille proportionnelle au score\n"
+        "folium.CircleMarker(\n"
+        "    location=info['center'],\n"
+        "    radius=max(28, min(55, score / 1.5)),\n"
+        "    color=color,   # vert/jaune/orange/rouge selon level\n"
+        "    fill=True, fill_opacity=0.35,\n"
+        "    popup=folium.Popup(html, max_width=260),\n"
+        "    tooltip=f\"{flag} {name} -- {score:.1f} / 100\",\n"
+        ").add_to(risk_group)\n"
+        "\n"
+        "st_folium(m, use_container_width=True, height=520)"
+    )
+    p.retenir(
+        "keep-alive : cron GitHub Actions toutes les 14 min -- l'API Render ne dorme jamais. "
+        "Secret API_BASE_URL injecte dans le workflow (${{ secrets.API_BASE_URL }}). "
+        "go.Indicator : mode='gauge+number+delta' pour delta vs periode precedente. "
+        "Esri WorldImagery : tuiles XYZ gratuites -- URL {z}/{y}/{x} (y avant x !). "
+        "overlay=True (CartoDB labels) : superpose sur Esri sans le remplacer. "
+        "st_folium(..., returned_objects=[]) : desactive le callback JS (plus rapide, "
+        "evite les re-rendus inutiles quand l'utilisateur interagit avec la carte)."
+    )
+
     # ── Page finale ───────────────────────────────────────────────────────
     p.add_page()
     p.set_y(90)
@@ -1516,7 +1634,7 @@ def build(p: SahelPDF):
            new_x=XPos.LMARGIN, new_y=YPos.NEXT)
     p._f("I", 11)
     p.set_text_color(190, 215, 240)
-    p.cell(0, 7, "Phase 5 : Prometheus + JWT + Render + Supabase + GitHub Actions (etapes 33-36).",
+    p.cell(0, 7, "Phase 5 : Prometheus + JWT + Render + Supabase + GitHub Actions + UI commerciale (etapes 33-37).",
            align="C", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
     p.set_y(150)

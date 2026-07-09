@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 import plotly.graph_objects as go
 import streamlit as st
 
@@ -12,11 +14,14 @@ _LEVEL_BADGE = {
     "critical": "🔴 CRITIQUE",
 }
 
-# ── Statut API ─────────────────────────────────────────────────────────────────
-health = get_health()
-api_ok = health.get("status") == "ok"
-db_ok  = health.get("db") == "ok"
+# ── Data fetch (en haut pour le monitoring strip) ──────────────────────────────
+health      = get_health()
+api_ok      = health.get("status") == "ok"
+db_ok       = health.get("db") == "ok"
+sen_records = get_risk_scores("SEN")
+civ_records = get_risk_scores("CIV")
 
+# ── Statut API ─────────────────────────────────────────────────────────────────
 if api_ok and db_ok:
     st.success("API opérationnelle  |  Base de données connectée", icon="✅")
 elif api_ok:
@@ -25,12 +30,48 @@ else:
     st.error("API indisponible — données en cache affichées si disponibles", icon="🔴")
 
 st.title("📊 Vue d'ensemble — État actuel")
+
+# ── Monitoring strip ───────────────────────────────────────────────────────────
+now = datetime.now(timezone.utc)
+
+# Prochain run GitHub Actions WB : 1er du mois suivant à 06h00 UTC
+if now.month == 12:
+    _next = datetime(now.year + 1, 1, 1, 6, 0, tzinfo=timezone.utc)
+else:
+    _next = datetime(now.year, now.month + 1, 1, 6, 0, tzinfo=timezone.utc)
+if now.day == 1 and now.hour < 6:
+    _next = datetime(now.year, now.month, 1, 6, 0, tzinfo=timezone.utc)
+
+days_until      = (_next.date() - now.date()).days
+next_run_label  = _next.strftime("%d/%m/%Y 06h00 UTC")
+
+# Dernière ingestion WB = period du record le plus récent (déjà trié DESC)
+last_wb = sen_records[0]["period"] if sen_records else (
+    civ_records[0]["period"] if civ_records else "—"
+)
+
+m1, m2, m3 = st.columns(3)
+m1.metric(
+    label="Statut système",
+    value="✅ Opérationnel" if (api_ok and db_ok) else ("⚠️ Dégradé" if api_ok else "❌ Hors ligne"),
+    help="GET /v1/health — API + Supabase",
+)
+m2.metric(
+    label="Dernière ingestion WB",
+    value=last_wb,
+    help="Période la plus récente dans mart__macro__indicators_annual",
+)
+m3.metric(
+    label="Prochain run pipeline",
+    value=f"J-{days_until}",
+    delta=next_run_label,
+    delta_color="off",
+    help="GitHub Actions ingest_worldbank.yml — cron 0 6 1 * *",
+)
+
 st.markdown("---")
 
-# ── Risk scores ────────────────────────────────────────────────────────────────
-sen_records = get_risk_scores("SEN")
-civ_records = get_risk_scores("CIV")
-
+# ── Risk score gauges ──────────────────────────────────────────────────────────
 col1, col2 = st.columns(2)
 
 
@@ -81,7 +122,7 @@ def _risk_gauge(score: float, delta_amount: float | None, title: str, level: str
     if delta_amount is not None:
         indicator_kwargs["delta"] = {
             "reference": score - delta_amount,
-            "increasing": {"color": "#e74c3c"},   # hausse du risque = rouge
+            "increasing": {"color": "#e74c3c"},
             "decreasing": {"color": "#2ecc71"},
         }
 
@@ -105,10 +146,10 @@ def _render_country(col, flag: str, name: str, records: list[dict]) -> None:
         current = records[0]
         prev    = records[1] if len(records) > 1 else None
 
-        score       = float(current["risk_score"])
-        delta       = round(score - float(prev["risk_score"]), 2) if prev else None
-        level       = current.get("risk_level", "low")
-        period      = current.get("period", "—")
+        score  = float(current["risk_score"])
+        delta  = round(score - float(prev["risk_score"]), 2) if prev else None
+        level  = current.get("risk_level", "low")
+        period = current.get("period", "—")
 
         st.plotly_chart(
             _risk_gauge(score, delta, f"{flag} {name} — {period}", level),

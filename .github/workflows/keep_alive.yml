@@ -1,0 +1,15 @@
+name: Keep-alive — API Render
+
+on:
+  schedule:
+    - cron: "*/14 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+
+    steps:
+      - name: Ping API health
+        run: curl -sf ${{ secrets.API_BASE_URL }}/v1/health
