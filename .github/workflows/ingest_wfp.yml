@@ -1,0 +1,28 @@
+name: Ingest WFP HDX → Supabase
+
+on:
+  schedule:
+    # 07h00 UTC le 1er du mois — 1h après ingest_worldbank (06h00)
+    # Garantit que l'inflation WB est en base avant que le risk score complet soit calculé
+    - cron: "0 7 1 * *"
+  workflow_dispatch:
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15   # CSV HDX complet (~20 ans) = téléchargement plus long que WB
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install psycopg2-binary
+
+      - name: Run WFP HDX ingestion
+        env:
+          DATABASE_URL_OVERRIDE: ${{ secrets.DATABASE_URL_OVERRIDE }}
+        run: python infra/supabase/ingest_wfp.py
