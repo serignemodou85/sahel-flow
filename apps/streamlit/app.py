@@ -38,7 +38,7 @@ with st.sidebar:
     st.markdown("---")
     st.markdown(
         "[GitHub](https://github.com/serignemodou85/sahel-flow) · "
-        "[Contact](mailto:tellofall@gmail.com)"
+        "[Contact](mailto:modou2000f@gmail.com)"
     )
 
 # ── Données ────────────────────────────────────────────────────────────────────

@@ -112,28 +112,28 @@ def risk_card(flag: str, country_name: str, records: list) -> None:
     st.markdown(
         f"""
         <div style="background:{bg};border-left:5px solid {color};border-radius:10px;
-                    padding:18px 20px;margin-bottom:8px;">
+                    padding:18px 20px;margin-bottom:8px;color:#1a1a1a;">
             <div style="display:flex;justify-content:space-between;
                         align-items:flex-start;flex-wrap:wrap;gap:8px;">
-                <span style="font-size:1.15em;font-weight:bold">{flag} {country_name}</span>
+                <span style="font-size:1.15em;font-weight:bold;color:#1a1a1a">{flag} {country_name}</span>
                 <span style="background:{color};color:white;padding:3px 14px;
                               border-radius:20px;font-weight:bold;
                               font-size:0.85em;white-space:nowrap">{label}</span>
             </div>
-            <p style="font-size:1.9em;font-weight:bold;margin:10px 0 0 0;line-height:1">
+            <p style="font-size:1.9em;font-weight:bold;margin:10px 0 0 0;line-height:1;color:#1a1a1a">
                 {score:.1f}
-                <span style="font-size:0.42em;color:#666;font-weight:normal"> / 100</span>
+                <span style="font-size:0.42em;color:#555;font-weight:normal"> / 100</span>
                 {delta_html}
             </p>
-            <p style="color:#888;font-size:0.78em;margin:3px 0 14px 0">Période : {period}</p>
+            <p style="color:#555;font-size:0.78em;margin:3px 0 14px 0">Période : {period}</p>
             <hr style="border:none;border-top:1px solid {color}55;margin:8px 0">
-            <p style="margin:6px 0;font-size:0.9em">
+            <p style="margin:6px 0;font-size:0.9em;color:#222">
                 <b>Situation :</b> {_SITUATIONS.get(level, '')}
             </p>
-            <p style="margin:6px 0;font-size:0.9em">
+            <p style="margin:6px 0;font-size:0.9em;color:#222">
                 ⚠️ <b>Point d'attention :</b> {attention}
             </p>
-            <p style="margin:6px 0;font-size:0.88em;color:#555">
+            <p style="margin:6px 0;font-size:0.88em;color:#444">
                 📌 <b>Recommandation :</b> {_RECOMMENDATIONS.get(level, '')}
             </p>
         </div>
