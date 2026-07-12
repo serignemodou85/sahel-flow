@@ -1,7 +1,9 @@
-import plotly.graph_objects as go
+from datetime import date, datetime, timedelta, timezone
+
 import streamlit as st
 
-from api_client import get_health, get_risk_scores
+from api_client import get_food_prices, get_health, get_risk_scores
+from utils import alert_banner, faits_marquants, pour_comprendre, rapport_texte, risk_card
 
 st.set_page_config(
     page_title="Sahel Flow — Sécurité Alimentaire UEMOA",
@@ -9,7 +11,7 @@ st.set_page_config(
     layout="wide",
 )
 
-# ── Sidebar commercial ─────────────────────────────────────────────────────────
+# ── Sidebar ────────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("## 🌍 Sahel Flow")
     st.caption("Surveillance de la sécurité alimentaire")
@@ -28,8 +30,8 @@ with st.sidebar:
     st.markdown("🇸🇳 Sénégal &nbsp;·&nbsp; 🇨🇮 Côte d'Ivoire")
     st.markdown("---")
     st.markdown("**Mise à jour des données**")
-    st.caption("Indicateurs macro : mensuelle via GitHub Actions + World Bank")
-    st.caption("Prix alimentaires : mensuelle (WFP VAM)")
+    st.caption("World Bank : 1er du mois via GitHub Actions")
+    st.caption("WFP HDX : 1er du mois via GitHub Actions")
     st.markdown("---")
     st.markdown("**Partenaires visés**")
     st.markdown("ONGs · Gouvernements · Bailleurs")
@@ -39,12 +41,23 @@ with st.sidebar:
         "[Contact](mailto:tellofall@gmail.com)"
     )
 
+# ── Données ────────────────────────────────────────────────────────────────────
+sen_records = get_risk_scores("SEN")
+civ_records = get_risk_scores("CIV")
+
+six_months_ago = (date.today() - timedelta(days=180)).isoformat()
+sen_prices = get_food_prices("SEN", start_date=six_months_ago)
+civ_prices = get_food_prices("CIV", start_date=six_months_ago)
+
+# ── Bannière d'alerte (visible en haut avant tout le reste) ────────────────────
+alert_banner(sen_records, civ_records)
+
 # ── Hero ───────────────────────────────────────────────────────────────────────
 st.markdown(
     """
     <div style="
         background: linear-gradient(135deg, #0d1b2a 0%, #1b4f72 60%, #2980b9 100%);
-        padding: 2.2rem 2rem;
+        padding: 2rem 2rem;
         border-radius: 14px;
         margin-bottom: 1.5rem;
         border: 1px solid #1a5276;
@@ -52,13 +65,13 @@ st.markdown(
         <h1 style="color: white; margin: 0; font-size: 2rem; letter-spacing: -0.5px;">
             🌍 Sahel Flow
         </h1>
-        <p style="color: #aed6f1; margin: 0.5rem 0 0 0; font-size: 1.1rem; font-weight: 500;">
-            Surveillance en temps réel de la sécurité alimentaire — Zone UEMOA
+        <p style="color: #aed6f1; margin: 0.5rem 0 0 0; font-size: 1.05rem; font-weight: 500;">
+            Surveillance de la sécurité alimentaire — Zone UEMOA
         </p>
-        <p style="color: #85c1e9; margin: 0.8rem 0 0 0; font-size: 0.9rem;">
+        <p style="color: #85c1e9; margin: 0.6rem 0 0 0; font-size: 0.88rem;">
             Indicateurs macro · Prix alimentaires · Score de risque · Cartographie satellite
         </p>
-        <p style="color: #5dade2; margin: 0.6rem 0 0 0; font-size: 0.82rem; font-style: italic;">
+        <p style="color: #5dade2; margin: 0.5rem 0 0 0; font-size: 0.82rem; font-style: italic;">
             Conçu pour les ONGs, gouvernements et institutions de recherche actifs en Afrique de l'Ouest
         </p>
     </div>
@@ -66,99 +79,76 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# ── Live risk gauges ───────────────────────────────────────────────────────────
-st.subheader("État actuel du risque alimentaire")
-
-sen_records = get_risk_scores("SEN")
-civ_records = get_risk_scores("CIV")
-
-_LEVEL_BADGE = {
-    "low":      "🟢 FAIBLE",
-    "medium":   "🟡 MOYEN",
-    "high":     "🟠 ÉLEVÉ",
-    "critical": "🔴 CRITIQUE",
-}
-
-
-def _gauge(score: float, title: str) -> go.Figure:
-    if score < 25:
-        color = "#2ecc71"
-    elif score < 50:
-        color = "#f1c40f"
-    elif score < 75:
-        color = "#e67e22"
-    else:
-        color = "#e74c3c"
-
-    fig = go.Figure(go.Indicator(
-        mode="gauge+number",
-        value=score,
-        title={"text": title, "font": {"size": 15}},
-        gauge={
-            "axis": {"range": [0, 100], "tickwidth": 1},
-            "bar": {"color": color, "thickness": 0.28},
-            "steps": [
-                {"range": [0, 25],   "color": "#d5f5e3"},
-                {"range": [25, 50],  "color": "#fef9e7"},
-                {"range": [50, 75],  "color": "#fdf2e9"},
-                {"range": [75, 100], "color": "#fdedec"},
-            ],
-            "threshold": {
-                "line": {"color": color, "width": 3},
-                "thickness": 0.75,
-                "value": score,
-            },
-        },
-        number={"suffix": " / 100", "font": {"size": 30}},
-    ))
-    fig.update_layout(
-        height=220,
-        margin=dict(l=20, r=20, t=50, b=10),
-        paper_bgcolor="rgba(0,0,0,0)",
-    )
-    return fig
-
+# ── Situation actuelle — cards décideur ────────────────────────────────────────
+st.subheader("Situation actuelle")
 
 col1, col2 = st.columns(2)
-
 with col1:
-    if sen_records:
-        r = sen_records[0]
-        score = float(r["risk_score"])
-        level = r.get("risk_level", "low")
-        st.plotly_chart(_gauge(score, "🇸🇳 Sénégal"), use_container_width=True)
-        st.caption(
-            f"Période : {r.get('period', '—')} &nbsp;|&nbsp; "
-            f"Niveau : **{_LEVEL_BADGE.get(level, level.upper())}**"
-        )
-    else:
-        st.info("🇸🇳 Sénégal — données indisponibles")
-
+    risk_card("🇸🇳", "Sénégal", sen_records)
 with col2:
-    if civ_records:
-        r = civ_records[0]
-        score = float(r["risk_score"])
-        level = r.get("risk_level", "low")
-        st.plotly_chart(_gauge(score, "🇨🇮 Côte d'Ivoire"), use_container_width=True)
-        st.caption(
-            f"Période : {r.get('period', '—')} &nbsp;|&nbsp; "
-            f"Niveau : **{_LEVEL_BADGE.get(level, level.upper())}**"
-        )
-    else:
-        st.info("🇨🇮 Côte d'Ivoire — données indisponibles")
+    risk_card("🇨🇮", "Côte d'Ivoire", civ_records)
+
+pour_comprendre(
+    "Comment lire les scores de situation ?",
+    """
+Le **score de risque** va de **0** (aucun risque) à **100** (crise alimentaire critique).
+
+Il combine deux indicateurs :
+- **60%** — Tendance des prix alimentaires sur les marchés locaux (source : WFP HDX)
+- **40%** — Taux d'inflation national annuel (source : Banque Mondiale)
+
+| Niveau | Score | Signification |
+|---|---|---|
+| 🟢 FAIBLE | 0 – 24 | Situation normale, surveillance de routine |
+| 🟡 MOYEN | 25 – 49 | Tension légère, à surveiller |
+| 🟠 ÉLEVÉ | 50 – 74 | Alerte — des mesures peuvent être nécessaires |
+| 🔴 CRITIQUE | 75 – 100 | Urgence — intervention recommandée |
+
+La flèche (↑ ↓) indique l'évolution par rapport au mois précédent.
+    """,
+)
 
 st.markdown("---")
 
-# ── Navigation cards ───────────────────────────────────────────────────────────
+# ── Faits marquants ce mois ────────────────────────────────────────────────────
+st.subheader("Ce mois — Faits marquants")
+
+bullets = faits_marquants(sen_prices, civ_prices)
+for b in bullets:
+    st.markdown(f"- {b}")
+
+now = datetime.now(timezone.utc)
+if now.month == 12:
+    next_run = datetime(now.year + 1, 1, 1, 6, 0, tzinfo=timezone.utc)
+else:
+    next_run = datetime(now.year, now.month + 1, 1, 6, 0, tzinfo=timezone.utc)
+st.markdown(
+    f"- 📊 Prochain point de données : "
+    f"**{next_run.strftime('%d/%m/%Y')} à 06h00 UTC** "
+    f"(GitHub Actions — World Bank + WFP HDX)"
+)
+
+# ── Bouton rapport téléchargeable ──────────────────────────────────────────────
+rapport = rapport_texte(sen_records, civ_records, bullets)
+st.download_button(
+    label="⬇️ Télécharger le rapport mensuel (.txt)",
+    data=rapport.encode("utf-8"),
+    file_name=f"sahel_flow_rapport_{date.today().strftime('%Y_%m')}.txt",
+    mime="text/plain",
+)
+
+st.markdown("---")
+
+# ── Navigation ─────────────────────────────────────────────────────────────────
 st.subheader("Explorer les données")
 
 cards = [
-    ("📊", "Vue d'ensemble",     "Risk score actuel SEN vs CIV · évolution 12 mois"),
-    ("🔄", "Comparaison",        "SEN vs CIV côte à côte sur une période choisie"),
-    ("🌾", "Prix Alimentaires",  "Prix par commodité, marché et période"),
-    ("📈", "Inflation",          "Indicateurs macro World Bank 2000 – 2024"),
-    ("🛰️", "Carte satellite",    "Visualisation géographique du risque"),
-    ("📐", "Méthodologie",       "Formule du score, sources et limites du modèle"),
+    ("📊", "Tableau de bord",          "Risk score détaillé · évolution 12 mois · monitoring système"),
+    ("🔄", "Comparaison SEN vs CIV",   "Les deux pays côte à côte sur une période choisie"),
+    ("🌾", "Marchés alimentaires",      "Prix par produit et variation 3 mois · feu tricolore"),
+    ("📈", "Économie & inflation",      "Indicateurs macro Banque Mondiale 2000 – 2024"),
+    ("🛰️", "Carte de situation",        "Visualisation géographique du risque alimentaire"),
+    ("📐", "À propos du système",       "Formule du score, sources de données et limites"),
 ]
 
 c1, c2, c3 = st.columns(3)
@@ -177,7 +167,7 @@ st.markdown("---")
 
 # ── KPI strip ──────────────────────────────────────────────────────────────────
 k1, k2, k3, k4 = st.columns(4)
-k1.metric("Pays couverts",      "2",          "SEN + CIV")
-k2.metric("Indicateurs WB",     "5",          "2000 – 2024")
-k3.metric("Mise à jour",        "Mensuelle",  "1er du mois")
-k4.metric("Pipeline",           "GitHub Actions", "cloud natif")
+k1.metric("Pays couverts",       "2",              "Sénégal + Côte d'Ivoire")
+k2.metric("Indicateurs WB",      "5",              "2000 – 2024")
+k3.metric("Mise à jour",         "Mensuelle",      "1er du mois — automatique")
+k4.metric("Infrastructure",      "GitHub Actions", "cloud natif, zéro serveur")
